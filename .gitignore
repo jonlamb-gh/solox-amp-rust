@@ -1,5 +1,4 @@
 /target
 **/*.rs.bk
-Cargo.lock
 /artifacts
 src/bin/root-task.rs
