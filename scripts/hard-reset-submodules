@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e
+
+git submodule foreach git reset --hard
+
+pushd libsel4-sys
+git submodule foreach git reset --hard
+popd
+
+exit 0

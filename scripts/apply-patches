@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -e
+
+git submodule update --init
+
+pushd libsel4-sys/
+git submodule update --init
+popd
+
+pushd libsel4-sys/deps/seL4_tools/elfloader-tool/
+echo "Patching elfloader-tool"
+git apply ../../../../patches/elfloader-tool.patch
+popd
+
+pushd libsel4-sys/deps/seL4_kernel/
+echo "Patching kernel"
+git apply ../../../patches/kernel.patch
+popd
+
+exit 0

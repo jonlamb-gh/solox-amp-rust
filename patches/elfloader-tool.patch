@@ -1,0 +1,86 @@
+diff --git a/elfloader-tool/CMakeLists.txt b/elfloader-tool/CMakeLists.txt
+index b8df6e1..e60e001 100644
+--- a/elfloader-tool/CMakeLists.txt
++++ b/elfloader-tool/CMakeLists.txt
+@@ -135,7 +135,8 @@ if (ElfloaderImageEFI)
+     set_property(TARGET elfloader APPEND_STRING PROPERTY LINK_FLAGS " -pie ")
+ else()
+     if(KernelPlatImx6 OR KernelPlatformRpi3)
+-        set(PlatformEntryAddr 0x20000000)
++        #set(PlatformEntryAddr 0x20000000)
++        set(PlatformEntryAddr 0x83000000)
+     elseif(KernelPlatformKZM OR KernelPlatformOMAP3 OR KernelPlatformAM335X OR KernelPlatformImx7Sabre)
+         set(PlatformEntryAddr 0x82000000)
+     elseif(KernelPlatExynos5 OR KernelPlatformExynos4)
+diff --git a/elfloader-tool/gen_boot_image.sh b/elfloader-tool/gen_boot_image.sh
+index a5dfaf6..c1fd2b7 100755
+--- a/elfloader-tool/gen_boot_image.sh
++++ b/elfloader-tool/gen_boot_image.sh
+@@ -40,7 +40,7 @@ case "$PLAT" in
+         FORMAT=elf32-littlearm
+         ;;
+     "imx6")
+-        ENTRY_ADDR=0x20000000;
++        ENTRY_ADDR=0x80000000;
+         FORMAT=elf32-littlearm
+         ;;
+     "imx7")
+diff --git a/elfloader-tool/include/plat/imx6/platform.h b/elfloader-tool/include/plat/imx6/platform.h
+index 9c46af3..e972f07 100644
+--- a/elfloader-tool/include/plat/imx6/platform.h
++++ b/elfloader-tool/include/plat/imx6/platform.h
+@@ -20,14 +20,17 @@
+  * (from IMX6 SoC Manual).
+  */
+ 
++/* UART1_URXD */
+ #define IMX6_UART1_PADDR   0x02020000
++/* UART2_URXD */
+ #define IMX6_UART2_PADDR   0x021e8000
+ #define IMX6_UART3_PADDR   0x021ec000
+ #define IMX6_UART4_PADDR   0x021f0000
+ #define IMX6_UART5_PADDR   0x021F4000
+ 
+ #ifdef CONFIG_PLAT_SABRE
+-#define UART_PPTR          IMX6_UART2_PADDR
++//#define UART_PPTR          IMX6_UART2_PADDR
++#define UART_PPTR          IMX6_UART1_PADDR
+ #elif CONFIG_PLAT_WANDQ
+ #define UART_PPTR          IMX6_UART1_PADDR
+ #else
+diff --git a/elfloader-tool/src/plat/imx6/monitor.S b/elfloader-tool/src/plat/imx6/monitor.S
+index b549b98..ee8db69 100644
+--- a/elfloader-tool/src/plat/imx6/monitor.S
++++ b/elfloader-tool/src/plat/imx6/monitor.S
+@@ -12,7 +12,8 @@
+ 
+ #include <autoconf.h>
+ 
+-#define VECTOR_BASE     0x10000000
++/* #define VECTOR_BASE     0x10000000 */
++#define VECTOR_BASE     0x80000000
+ #define STACK_TOP       (VECTOR_BASE + (1 << 12) - 0x10)
+ 
+ /* vector table for monitor mode
+diff --git a/elfloader-tool/src/plat/imx6/platform_init.c b/elfloader-tool/src/plat/imx6/platform_init.c
+index b24f5cf..2b48b92 100644
+--- a/elfloader-tool/src/plat/imx6/platform_init.c
++++ b/elfloader-tool/src/plat/imx6/platform_init.c
+@@ -76,6 +76,7 @@ check_mode(void)
+ 
+ asm (".arch_extension sec\n");
+ 
++
+ #ifndef CONFIG_ARM_S_SUPERVISOR_MODE
+ __attribute__((unused)) static void
+ switch_to_mon_mode(void)
+@@ -117,7 +118,8 @@ switch_to_mon_mode(void)
+  * must not be used by the seL4 kernel. The VECTOR_BASE must be
+  * the same as MON_VECTOR_START */
+ 
+-#define MON_VECTOR_START    (0x10000000)
++/* #define MON_VECTOR_START    (0x10000000) */
++#define MON_VECTOR_START    (0x80000000)
+ extern void arm_monitor_vector(void);
+ extern void arm_monitor_vector_end(void);
+ extern void *memcpy(void *dest, void *src, size_t n);

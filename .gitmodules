@@ -1,0 +1,3 @@
+[submodule "libsel4-sys"]
+	path = libsel4-sys
+	url = https://github.com/jonlamb-gh/libsel4-sys.git

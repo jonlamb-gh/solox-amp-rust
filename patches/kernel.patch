@@ -1,0 +1,89 @@
+diff --git a/include/plat/imx6/plat/machine/devices.h b/include/plat/imx6/plat/machine/devices.h
+index 892ee9c..414bfc7 100644
+--- a/include/plat/imx6/plat/machine/devices.h
++++ b/include/plat/imx6/plat/machine/devices.h
+@@ -13,7 +13,8 @@
+ 
+ /* These devices are used by the seL4 kernel. */
+ #ifdef CONFIG_PLAT_SABRE
+-#define UART_PADDR                  UART2_PADDR
++//#define UART_PADDR                  UART2_PADDR
++#define UART_PADDR                  UART1_PADDR
+ #elif defined(CONFIG_PLAT_WANDQ)
+ #define UART_PADDR                  UART1_PADDR
+ #else
+@@ -39,6 +40,7 @@
+ //#define RESERVED_PADDR          0x02C00000 /*  84 MB    */
+ #define IPU2_PADDR                0x02800000 /*   4 MB    */
+ #define IPU1_PADDR                0x02400000 /*   4 MB    */
++#define AIPS3_CONFIG_PADDR        0x0227C000 /*   4 pages */
+ //#define RESERVED_PADDR          0x0220C000 /*   1 MB    */
+ #define MIPI_HSI_PADDR            0x02208000 /*   4 pages */
+ #define OPENVG_PADDR              0x02204000 /*   4 pages */
+@@ -168,6 +170,7 @@
+ #define OCRAM_ALIASED_PADDR       0x00940000 /* 192 pages */
+ #define OCRAM_PADDR               0x00900000 /*  64 pages */
+ #define GPV4_PL301_CONFIG_PADDR   0x00800000 /*   1 MB    */
++#define TCML_PADDR                0x007F8000 /*  8 pages */
+ //#define RESERVED_PADDR          0x00400000 /*   4 MB    */
+ #define GPV3_PL301_CONFIG_PADDR   0x00300000 /*   1 MB    */
+ #define GPV2_PL301_CONFIG_PADDR   0x00200000 /*   1 MB    */
+diff --git a/include/plat/imx6/plat/machine/hardware.h b/include/plat/imx6/plat/machine/hardware.h
+index 4365048..f2d0555 100644
+--- a/include/plat/imx6/plat/machine/hardware.h
++++ b/include/plat/imx6/plat/machine/hardware.h
+@@ -18,7 +18,8 @@
+ #include <plat/machine/devices.h>
+ #include <arch/benchmark_overflowHandler.h>
+ 
+-#define physBase          0x10000000
++//#define physBase          0x10000000
++#define physBase          0x80000000
+ #define kernelBase        0xe0000000
+ 
+ static const kernel_frame_t BOOT_RODATA kernel_devices[] = {
+@@ -54,7 +55,8 @@ static const kernel_frame_t BOOT_RODATA kernel_devices[] = {
+ static const p_region_t BOOT_RODATA avail_p_regs[] = {
+ #if defined(CONFIG_PLAT_SABRE)
+     /* Sabre has 1 GiB */
+-    { /* .start = */ 0x10000000, /* .end = */ 0x50000000 }
++    //{ /* .start = */ 0x10000000, /* .end = */ 0x50000000 }
++    { /* .start = */ 0x80000000, /* .end = */ 0xc0000000 }
+ #elif defined(CONFIG_PLAT_WANDQ)
+     /* Wandboard Quad: 2 GiB */
+     { /* .start = */ 0x10000000, /* .end = */ 0x90000000 }
+@@ -65,6 +67,7 @@ static const p_region_t BOOT_RODATA dev_p_regs[] = {
+ //  { /* .start = */ EIM_CS0_PADDR          , /* .end = */ EIM_CS0_PADDR           + (128 << 20)},
+     { /* .start = */ IPU2_PADDR             , /* .end = */ IPU2_PADDR              + (  4 << 20)},
+     { /* .start = */ IPU1_PADDR             , /* .end = */ IPU1_PADDR              + (  4 << 20)},
++    { /* .start = */ AIPS3_CONFIG_PADDR     , /* .end = */ AIPS3_CONFIG_PADDR      + (  4 << 12)},
+     { /* .start = */ MIPI_HSI_PADDR         , /* .end = */ MIPI_HSI_PADDR          + (  4 << 12)},
+     { /* .start = */ OPENVG_PADDR           , /* .end = */ OPENVG_PADDR            + (  4 << 12)},
+     { /* .start = */ SATA_PADDR             , /* .end = */ SATA_PADDR              + (  4 << 12)},
+@@ -174,6 +177,7 @@ static const p_region_t BOOT_RODATA dev_p_regs[] = {
+     { /* .start = */ OCRAM_ALIASED_PADDR    , /* .end = */ OCRAM_ALIASED_PADDR     + (192 << 12)},
+     { /* .start = */ OCRAM_PADDR            , /* .end = */ OCRAM_PADDR             + ( 64 << 12)},
+     { /* .start = */ GPV4_PL301_CONFIG_PADDR, /* .end = */ GPV4_PL301_CONFIG_PADDR + (  1 << 20)},
++    { /* .start = */ TCML_PADDR             , /* .end = */ TCML_PADDR              + (  8 << 12)},
+     { /* .start = */ GPV3_PL301_CONFIG_PADDR, /* .end = */ GPV3_PL301_CONFIG_PADDR + (  1 << 20)},
+     { /* .start = */ GPV2_PL301_CONFIG_PADDR, /* .end = */ GPV2_PL301_CONFIG_PADDR + (  1 << 20)},
+     { /* .start = */ DTCP_PADDR             , /* .end = */ DTCP_PADDR              + (  4 << 12)},
+diff --git a/src/plat/imx6/linker.lds b/src/plat/imx6/linker.lds
+index 836ca3c..a31ef7f 100644
+--- a/src/plat/imx6/linker.lds
++++ b/src/plat/imx6/linker.lds
+@@ -11,8 +11,12 @@
+ ENTRY(_start)
+ 
+ /* WARNING: constants also defined in plat/machine/hardware.h */
+-KERNEL_BASE   = 0xe0000000;
+-PHYS_BASE     = 0x10000000;
++/* KERNEL_BASE   = 0xe0000000; */
++/* PHYS_BASE     = 0x10000000; */
++
++KERNEL_BASE = 0xe0000000;
++PHYS_BASE = 0x80000000;
++
+ KERNEL_OFFSET = KERNEL_BASE - PHYS_BASE;
+ 
+ SECTIONS
