@@ -25,6 +25,8 @@ setenv loadaddr 0x83000000
 setenv bootfel4img 'tftp ${loadaddr} ${serverip}:feL4img; dcache flush; dcache off; go ${loadaddr}'
 ```
 
+Apply local patches to convert the imx6/sabre-lite platform into something the SoloX will run.
+
 ```bash
 ./scripts/apply-patches
 
