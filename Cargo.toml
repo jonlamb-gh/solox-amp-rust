@@ -7,6 +7,7 @@ authors = ["jonlamb-gh <lamb.jon.io@gmail.com>"]
 # tracked as a submodule currently
 #libsel4-sys = {git = "https://github.com/jonlamb-gh/libsel4-sys.git", branch = "devel"}
 libsel4-sys = {path = "libsel4-sys"}
+rlibc = "1.0"
 
 [dependencies.wee_alloc]
 version = "0.4"
