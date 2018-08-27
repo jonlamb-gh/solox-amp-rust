@@ -7,6 +7,7 @@ extern crate alloc;
 
 extern crate rlibc;
 extern crate sel4_sys;
+extern crate sel4twinkle_alloc;
 
 #[cfg(all(feature = "test"))]
 #[macro_use]
