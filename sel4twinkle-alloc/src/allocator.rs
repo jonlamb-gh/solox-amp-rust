@@ -1,5 +1,5 @@
 use super::{
-    Allocator, CapRange, UntypedItem, MAX_UNTYPED_ITEMS, MAX_UNTYPED_SIZE, MIN_UNTYPED_SIZE,
+    Allocator, Error, CapRange, UntypedItem, MAX_UNTYPED_ITEMS, MAX_UNTYPED_SIZE, MIN_UNTYPED_SIZE,
 };
 use core::mem;
 use sel4_sys::{
@@ -77,10 +77,10 @@ impl Allocator {
     }
 
     /// Allocate an empty cslot.
-    pub fn alloc_cslot(&mut self) -> Option<seL4_CPtr> {
+    pub fn alloc_cslot(&mut self) -> Result<seL4_CPtr, Error> {
         // Determine whether we have any free slots
         if (self.cslots.count - self.num_slots_used) == 0 {
-            return None;
+            return Err(Error::ResourceExhausted);
         }
 
         // Pick the first one
@@ -91,7 +91,7 @@ impl Allocator {
         // Record this slot as used
         self.num_slots_used += 1;
 
-        Some(result)
+        Ok(result)
     }
 
     /// Free an empty cslot.
@@ -113,7 +113,7 @@ impl Allocator {
         item_type: seL4_Word,
         item_size: usize,
         num_items: usize,
-    ) -> Option<CapRange> {
+    ) -> Result<CapRange, Error> {
         let mut result = CapRange { first: 0, count: 0 };
 
         // Determine the maximum number of items we have space in our CNode for
@@ -121,7 +121,7 @@ impl Allocator {
         if num_items > max_objects {
             result.count = 0;
             result.first = 0;
-            return None;
+            return Err(Error::ResourceExhausted);
         }
 
         // Do the allocation. We expect at least one item will be created
@@ -137,7 +137,9 @@ impl Allocator {
                 num_items as _,
             )
         };
-        assert!(err == 0);
+        if err != 0 {
+            return Err(Error::Other);
+        }
 
         // Save the allocation
         result.count = num_items;
@@ -146,25 +148,23 @@ impl Allocator {
         // Record these slots as used
         self.num_slots_used += num_items;
 
-        Some(result)
+        Ok(result)
     }
 
     /// Allocate untyped item of size 'size_bits' bits.
-    pub fn alloc_untyped(&mut self, size_bits: usize) -> Option<seL4_CPtr> {
+    pub fn alloc_untyped(&mut self, size_bits: usize) -> Result<seL4_CPtr, Error> {
         // If it is too small or too big, not much we can do
         if size_bits < MIN_UNTYPED_SIZE {
-            return None;
+            return Err(Error::Other);
         }
         if size_bits > MAX_UNTYPED_SIZE {
-            return None;
+            return Err(Error::Other);
         }
 
         let mut pool = self.untyped_items[size_bits - MIN_UNTYPED_SIZE].clone();
 
         // Do we have something of the correct size in one of our pools?
-        if let None = self.range_alloc(&mut pool, 1) {
-            return None;
-        }
+        let _ = self.range_alloc(&mut pool, 1)?;
 
         // Do we have something of the correct size in initial memory regions?
         for i in 0..self.num_init_untyped_items {
@@ -172,7 +172,7 @@ impl Allocator {
                 && (self.init_untyped_items[i].item.size_bits == size_bits)
             {
                 self.init_untyped_items[i].is_free = false;
-                return Some(self.init_untyped_items[i].item.cap);
+                return Ok(self.init_untyped_items[i].item.cap);
             }
         }
 
@@ -194,16 +194,16 @@ impl Allocator {
     }
 
     /// Allocate 'count' items out of the given range.
-    fn range_alloc(&mut self, range: &mut CapRange, count: usize) -> Option<seL4_CPtr> {
+    fn range_alloc(&mut self, range: &mut CapRange, count: usize) -> Result<seL4_CPtr, Error> {
         // If there are not enough items in the range, abort
         if range.count < count {
-            return None;
+            return Err(Error::ResourceExhausted);
         }
 
         // Allocate from the range
         assert!(range.first != 0);
         range.count -= count;
 
-        return Some((range.first + range.count) as _);
+        return Ok((range.first + range.count) as _);
     }
 }

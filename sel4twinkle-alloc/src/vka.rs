@@ -1,6 +1,6 @@
 /// TODO - need a proper VKA abstration and implementation
 
-use super::Allocator;
+use super::{Allocator, Error};
 use cspacepath::CSpacePath;
 use sel4_sys::{
     api_object_seL4_CapTableObject, api_object_seL4_EndpointObject,
@@ -17,6 +17,7 @@ impl Allocator {
     /// RT/etc)
     /// TODO - move this once vka_object/vka works
     pub fn vka_get_object_size(&self, obj_type: seL4_Word, obj_size_bits: usize) -> usize {
+        #[allow(non_upper_case_globals)]
         match obj_type {
             api_object_seL4_UntypedObject => obj_size_bits as _,
             api_object_seL4_TCBObject => seL4_TCBBits as _,
@@ -28,7 +29,7 @@ impl Allocator {
         }
     }
 
-    pub fn vka_cspace_alloc(&mut self) -> Option<seL4_CPtr> {
+    pub fn vka_cspace_alloc(&mut self) -> Result<seL4_CPtr, Error> {
         self.alloc_cslot()
     }
 
@@ -52,7 +53,7 @@ impl Allocator {
         dest: &CSpacePath,
         item_type: seL4_Word,
         size_bits: seL4_Word,
-    ) -> Option<seL4_CPtr> {
+    ) -> Result<seL4_CPtr, Error> {
         let ut_size_bits = self.vka_get_object_size(item_type, size_bits as _);
 
         // allocate untyped memory the size we want
@@ -72,9 +73,11 @@ impl Allocator {
         };
 
         if err == 0 {
-            Some(untyped_memory)
+            Ok(untyped_memory)
         } else {
-            None
+            Err(Error::ResourceExhausted)
         }
     }
+
+    // TODO - vka_alloc_tcb()
 }

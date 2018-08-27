@@ -47,7 +47,7 @@ pub fn run() {
     // get first CPIO entry, should be our M4 binary file
     let m4_bin_fw_cpio_file = cpio_reader.parse_entry();
 
-    debug_println!("parsed CPIO entry\n{:#?}", m4_bin_fw_cpio_file);
+    debug_println!("parsed CPIO entry '{}'\n{:#?}", m4_bin_fw_cpio_file.file_name(), m4_bin_fw_cpio_file);
 
     // TODO - this will fault, need to map in the device frames to back the vaddr's
 

@@ -22,6 +22,13 @@ pub const MAX_UNTYPED_SIZE: usize = 32;
 
 pub const MAX_UNTYPED_ITEMS: usize = 256;
 
+// TODO - should be derived from libsel4-sys?
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Error {
+    ResourceExhausted,
+    Other,
+}
+
 #[derive(Clone)]
 pub struct UntypedItem {
     cap: seL4_CPtr,

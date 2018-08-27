@@ -20,7 +20,7 @@ impl Allocator {
 
     /// Fill the given allocator with resources from the given
     /// bootinfo structure.
-    pub fn fill_allocator_with_resources(&mut self, bootinfo: &'static seL4_BootInfo) {
+    fn fill_allocator_with_resources(&mut self, bootinfo: &'static seL4_BootInfo) {
         for i in 0..(bootinfo.untyped.end - bootinfo.untyped.start) {
             self.add_root_untyped_item(
                 bootinfo.untyped.start + i,
