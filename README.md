@@ -30,6 +30,7 @@ Apply local patches to convert the imx6/sabre-lite platform into something the S
 ```bash
 ./scripts/apply-patches
 
+# a build.rs script is used to invoke the 'm4-firmware' project build
 cargo fel4 build
 ```
 
