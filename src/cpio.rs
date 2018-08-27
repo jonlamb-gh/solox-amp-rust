@@ -1,3 +1,4 @@
+use core::str;
 /// This is just a bare minimum utility.
 ///
 /// Only supports the first file, doesn't look at the checksum.
@@ -6,7 +7,6 @@
 /// - https://github.com/jcreekmore/cpio-rs
 /// - https://github.com/seL4/util_libs/blob/master/libcpio/include/cpio/cpio.h
 use rlibc;
-use core::str;
 
 const HEADER_LEN: usize = 110;
 

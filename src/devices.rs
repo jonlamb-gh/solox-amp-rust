@@ -1,5 +1,6 @@
 // TODO - the virtual addresses are arbitrary but free locations
 // TODO - construct a basic SVD file
+#![allow(unused)]
 
 use sel4_sys::{seL4_PageBits, seL4_Word};
 //use core::ptr;
