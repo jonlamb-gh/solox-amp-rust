@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+set -e
+
+if [ -f /opt/arm-none-eabi-v7/env ]; then
+    echo "Sourcing custom toolchain"
+    source /opt/arm-none-eabi-v7/env
+fi
+
+# unset some of cargo's environment since we're building for a different
+# target
+unset RUSTFLAGS
+unset RUST_TARGET_PATH
+unset TARGET
+
+cargo build --target thumbv7em-none-eabi --release &> m4-build-result.txt
+
+if [ ! -f ${PWD}/target/thumbv7em-none-eabi/release/m4-firmware ]; then
+    echo "Failed to build the Rust M4 project"
+    exit 1
+fi
+
+#export V=3
+export PLAT=imx6
+export SEL4_ARCH=aarch32
+export TOOLPREFIX=arm-none-eabi-
+
+# create a binary from the ELF file
+arm-none-eabi-objcopy -O binary \
+    ${PWD}/target/thumbv7em-none-eabi/release/m4-firmware \
+    ${PWD}/target/thumbv7em-none-eabi/release/m4-firmware.bin
+
+# create a CPIO archive object from our binary
+../libsel4-sys/deps/seL4_tools/common-tool/files_to_obj.sh \
+    ${PWD}/target/thumbv7em-none-eabi/release/archive.o \
+    _cpio_archive \
+    ${PWD}/target/thumbv7em-none-eabi/release/m4-firmware.bin
+
+# turn the CPIO archive object into a static archive library
+arm-none-eabi-ar \
+    rcs \
+    ${PWD}/target/thumbv7em-none-eabi/release/libm4archive.a \
+    ${PWD}/target/thumbv7em-none-eabi/release/archive.o
+
+echo "ELF file: ${PWD}/target/thumbv7em-none-eabi/release/m4-firmware"
+echo "binary file: ${PWD}/target/thumbv7em-none-eabi/release/m4-firmware.bin"
+echo "CPIO archive object: ${PWD}/target/thumbv7em-none-eabi/release/archive.o"
+echo "static archive library: ${PWD}/target/thumbv7em-none-eabi/release/libm4archive.a"
+
+exit 0

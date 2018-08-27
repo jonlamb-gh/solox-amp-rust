@@ -114,12 +114,13 @@ KernelPrinting = false
 
 [armv7-sel4-fel4.sabre]
 KernelARMPlatform = "sabre"
-ElfloaderImage = "elf"
+ElfloaderImage = "binary"
 ElfloaderMode = "secure supervisor"
 ElfloaderErrata764369 = true
 KernelArmEnableA9Prefetcher = false
 KernelArmExportPMUUser = false
-KernelDebugDisableL2Cache = false
+# L2 cache memory is currently defined as OCRAM for the M4
+KernelDebugDisableL2Cache = true
 
 [aarch64-sel4-fel4]
 BuildWithCommonSimulationSettings = true

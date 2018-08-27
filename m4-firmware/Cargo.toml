@@ -1,0 +1,14 @@
+[package]
+name = "m4-firmware"
+version = "0.0.1"
+publish = false
+
+[dependencies]
+cortex-m = "0.5.2"
+cortex-m-rt = "0.5.1"
+panic-abort = "0.2.0"
+
+[profile.release]
+codegen-units = 1 # better optimizations
+debug = true
+lto = true # better optimizations

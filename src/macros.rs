@@ -1,6 +1,3 @@
-#[cfg(feature = "KernelPrinting")]
-use sel4_sys::DebugOutHandle;
-
 macro_rules! debug_print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
