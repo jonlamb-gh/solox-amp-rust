@@ -21,8 +21,11 @@ mod macros;
 mod cpio;
 mod devices;
 
+use core::mem;
 use core::ptr;
 use devices::*;
+use sel4_sys::*;
+use sel4twinkle_alloc::Allocator;
 
 // CPIO archive in our ELF file
 #[link(name = "m4archive")]
@@ -33,7 +36,47 @@ extern "C" {
     static _binary_archive_cpio_size: u32;
 }
 
-pub fn run() {
+const FAULT_EP_BADGE: seL4_Word = 0xBEEF;
+
+const CHILD_STACK_SIZE: usize = 4096;
+static mut CHILD_STACK: *const [u64; CHILD_STACK_SIZE] = &[0; CHILD_STACK_SIZE];
+
+pub fn init(allocator: &mut Allocator, fault_ep_cap: seL4_CPtr) {
+    debug_println!("feL4 app init");
+
+    let tcb_obj = allocator.vka_alloc_tcb().unwrap();
+    let tcb_cap = tcb_obj.cptr;
+
+    let pd_cap = seL4_CapInitThreadVSpace;
+    let cspace_cap = seL4_CapInitThreadCNode;
+
+    let tcb_err: seL4_Error = unsafe {
+        seL4_TCB_Configure(
+            tcb_cap,
+            seL4_CapNull.into(),
+            cspace_cap.into(),
+            seL4_NilData.into(),
+            pd_cap.into(),
+            seL4_NilData.into(),
+            0,
+            0,
+        )
+    };
+
+    assert!(tcb_err == 0, "Failed to configure TCB");
+
+    let stack_base = unsafe { CHILD_STACK as usize };
+    let stack_top = stack_base + CHILD_STACK_SIZE;
+    let mut regs: seL4_UserContext = unsafe { mem::zeroed() };
+    regs.pc = thread_run as seL4_Word;
+    regs.sp = stack_top as seL4_Word;
+
+    let _: u32 = unsafe { seL4_TCB_WriteRegisters(tcb_cap, 0, 0, 2, &mut regs) };
+    let _: u32 = unsafe { seL4_TCB_SetPriority(tcb_cap, seL4_CapInitThreadTCB.into(), 255) };
+    let _: u32 = unsafe { seL4_TCB_Resume(tcb_cap) };
+}
+
+pub fn thread_run() {
     debug_println!("\nhello from a feL4 thread!\n");
 
     // construct CPIO pointers, symbols are from our ELF file
@@ -47,7 +90,11 @@ pub fn run() {
     // get first CPIO entry, should be our M4 binary file
     let m4_bin_fw_cpio_file = cpio_reader.parse_entry();
 
-    debug_println!("parsed CPIO entry '{}'\n{:#?}", m4_bin_fw_cpio_file.file_name(), m4_bin_fw_cpio_file);
+    debug_println!(
+        "parsed CPIO entry '{}'\n{:#?}",
+        m4_bin_fw_cpio_file.file_name(),
+        m4_bin_fw_cpio_file
+    );
 
     // TODO - this will fault, need to map in the device frames to back the vaddr's
 

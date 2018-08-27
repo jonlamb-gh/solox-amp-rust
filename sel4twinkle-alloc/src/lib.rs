@@ -22,6 +22,8 @@ pub const MAX_UNTYPED_SIZE: usize = 32;
 
 pub const MAX_UNTYPED_ITEMS: usize = 256;
 
+pub const VKA_NO_PADDR: u32 = 0;
+
 // TODO - should be derived from libsel4-sys?
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -29,19 +31,19 @@ pub enum Error {
     Other,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UntypedItem {
     cap: seL4_CPtr,
     size_bits: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CapRange {
     first: usize,
     count: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct InitUntypedItem {
     item: UntypedItem,
     is_free: bool,

@@ -1,5 +1,4 @@
 /// TODO - need a proper VKA abstration and implementation
-
 use super::{Allocator, Error};
 use cspacepath::CSpacePath;
 use sel4_sys::{
@@ -37,24 +36,25 @@ impl Allocator {
         self.free_cslot(slot)
     }
 
-    pub fn vka_cspace_make_path(&self, slot: seL4_CPtr, path: &mut CSpacePath) {
-        path.cap_ptr = slot;
-        path.cap_depth = 32;
-        path.root = self.root_cnode;
-        path.dest = self.root_cnode;
-        path.dest_depth = self.root_cnode_depth;
-        path.offset = slot;
-        path.window = 1;
+    pub fn vka_cspace_make_path(&self, slot: seL4_CPtr) -> CSpacePath {
+        CSpacePath {
+            cap_ptr: slot,
+            cap_depth: 32,
+            root: self.root_cnode,
+            dest: self.root_cnode,
+            dest_depth: self.root_cnode_depth,
+            offset: slot,
+            window: 1,
+        }
     }
 
-    // TODO - result
     pub fn vka_utspace_alloc(
         &mut self,
         dest: &CSpacePath,
         item_type: seL4_Word,
-        size_bits: seL4_Word,
+        size_bits: usize,
     ) -> Result<seL4_CPtr, Error> {
-        let ut_size_bits = self.vka_get_object_size(item_type, size_bits as _);
+        let ut_size_bits = self.vka_get_object_size(item_type, size_bits);
 
         // allocate untyped memory the size we want
         let untyped_memory = self.alloc_untyped(ut_size_bits)?;
@@ -63,7 +63,7 @@ impl Allocator {
             seL4_Untyped_Retype(
                 untyped_memory,
                 item_type,
-                size_bits,
+                size_bits as _,
                 seL4_CapInitThreadCNode,
                 self.root_cnode,
                 self.root_cnode_depth,
@@ -78,6 +78,4 @@ impl Allocator {
             Err(Error::ResourceExhausted)
         }
     }
-
-    // TODO - vka_alloc_tcb()
 }

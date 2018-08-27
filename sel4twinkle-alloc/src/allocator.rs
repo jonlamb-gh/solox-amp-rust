@@ -1,5 +1,5 @@
 use super::{
-    Allocator, Error, CapRange, UntypedItem, MAX_UNTYPED_ITEMS, MAX_UNTYPED_SIZE, MIN_UNTYPED_SIZE,
+    Allocator, CapRange, Error, UntypedItem, MAX_UNTYPED_ITEMS, MAX_UNTYPED_SIZE, MIN_UNTYPED_SIZE,
 };
 use core::mem;
 use sel4_sys::{
@@ -164,7 +164,9 @@ impl Allocator {
         let mut pool = self.untyped_items[size_bits - MIN_UNTYPED_SIZE].clone();
 
         // Do we have something of the correct size in one of our pools?
-        let _ = self.range_alloc(&mut pool, 1)?;
+        if let Ok(valid_cap) = self.range_alloc(&mut pool, 1) {
+            return Ok(valid_cap);
+        }
 
         // Do we have something of the correct size in initial memory regions?
         for i in 0..self.num_init_untyped_items {
