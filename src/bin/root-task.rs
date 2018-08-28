@@ -177,6 +177,9 @@ fn main() {
 
     let mut allocator = Allocator::new();
     allocator.bootstrap(bootinfo);
+    allocator
+        .bootstrap_vspace(seL4_CapInitThreadVSpace)
+        .unwrap();
 
     let fault_ep_obj = allocator.vka_alloc_endpoint().unwrap();
     let fault_ep_cap = fault_ep_obj.cptr;

@@ -1,10 +1,6 @@
 /// https://github.com/seL4/seL4_libs/blob/master/libsel4vka/include/vka/object.h
 use super::{Allocator, Error};
-use sel4_sys::{
-    api_object_seL4_EndpointObject, api_object_seL4_NotificationObject, api_object_seL4_TCBObject,
-    api_object_seL4_UntypedObject, seL4_CPtr, seL4_EndpointBits, seL4_NotificationBits,
-    seL4_TCBBits, seL4_Word,
-};
+use sel4_sys::*;
 
 /// A wrapper to hold all the allocation information for an 'object'.
 ///
@@ -48,6 +44,15 @@ impl Allocator {
             api_object_seL4_NotificationObject,
             seL4_NotificationBits as _,
         )
+    }
+
+    // TODO - need to do kobject_get_type()
+    pub fn vka_alloc_frame(&mut self, size_bits: usize) -> Result<VkaObject, Error> {
+        self.vka_alloc_object(_object_seL4_ARM_SmallPageObject, size_bits)
+    }
+
+    pub fn vka_alloc_page_table(&mut self) -> Result<VkaObject, Error> {
+        self.vka_alloc_object(_object_seL4_ARM_PageTableObject, seL4_PageTableBits as _)
     }
 
     /// Generic object allocator.

@@ -8,7 +8,7 @@ use sel4_sys::{
 };
 
 impl Allocator {
-    /// TODO
+    /// TODO - don't need to zero, just do a normal construct
     pub fn new() -> Allocator {
         let alloc: Allocator = unsafe { mem::zeroed() };
 
@@ -54,7 +54,12 @@ impl Allocator {
 
         // Copy untyped items
         for i in 0..items.len() {
-            self.add_root_untyped_item(items[i].cap, items[i].size_bits);
+            self.add_root_untyped_item(
+                items[i].cap,
+                items[i].size_bits,
+                items[i].paddr,
+                items[i].is_device,
+            );
         }
     }
 
@@ -63,7 +68,13 @@ impl Allocator {
     /// The allocator will permanently hold on to this memory
     /// and continue using it until `destroy()` is called,
     /// even if the allocator is reset.
-    pub fn add_root_untyped_item(&mut self, cap: seL4_CPtr, size_bits: usize) {
+    pub fn add_root_untyped_item(
+        &mut self,
+        cap: seL4_CPtr,
+        size_bits: usize,
+        paddr: seL4_Word,
+        is_device: bool,
+    ) {
         assert!(cap != 0);
         assert!(size_bits >= MIN_UNTYPED_SIZE);
         assert!(size_bits <= MAX_UNTYPED_SIZE);
@@ -72,6 +83,8 @@ impl Allocator {
         let next_item = self.num_init_untyped_items;
         self.init_untyped_items[next_item].item.cap = cap;
         self.init_untyped_items[next_item].item.size_bits = size_bits;
+        self.init_untyped_items[next_item].item.paddr = paddr;
+        self.init_untyped_items[next_item].item.is_device = is_device;
         self.init_untyped_items[next_item].is_free = true;
         self.num_init_untyped_items += 1;
     }
@@ -152,7 +165,12 @@ impl Allocator {
     }
 
     /// Allocate untyped item of size 'size_bits' bits.
-    pub fn alloc_untyped(&mut self, size_bits: usize) -> Result<seL4_CPtr, Error> {
+    pub fn alloc_untyped(
+        &mut self,
+        size_bits: usize,
+        paddr: Option<seL4_Word>,
+        can_use_dev: bool,
+    ) -> Result<seL4_CPtr, Error> {
         // If it is too small or too big, not much we can do
         if size_bits < MIN_UNTYPED_SIZE {
             return Err(Error::Other);
@@ -173,13 +191,31 @@ impl Allocator {
             if self.init_untyped_items[i].is_free
                 && (self.init_untyped_items[i].item.size_bits == size_bits)
             {
-                self.init_untyped_items[i].is_free = false;
-                return Ok(self.init_untyped_items[i].item.cap);
+                let mut consume = false;
+
+                if let Some(paddr) = paddr {
+                    if self.init_untyped_items[i].item.paddr == paddr {
+                        consume = true;
+                    }
+                } else {
+                    consume = true;
+                }
+
+                if !can_use_dev {
+                    if self.init_untyped_items[i].item.is_device {
+                        consume = false;
+                    }
+                }
+
+                if consume {
+                    self.init_untyped_items[i].is_free = false;
+                    return Ok(self.init_untyped_items[i].item.cap);
+                }
             }
         }
 
         // Otherwise, try splitting something of a bigger size, recursively
-        let big_untyped_item = self.alloc_untyped(size_bits + 1)?;
+        let big_untyped_item = self.alloc_untyped(size_bits + 1, paddr, can_use_dev)?;
 
         let range = self.retype_untyped_memory(
             big_untyped_item,

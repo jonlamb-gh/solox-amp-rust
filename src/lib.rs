@@ -38,10 +38,13 @@ extern "C" {
 
 const FAULT_EP_BADGE: seL4_Word = 0xBEEF;
 
+/// use a 4K frame for the IPC buffer
+const THREAD_IPC_BUFFER_FRAME_SIZE_BITS: usize = 12;
+
 const CHILD_STACK_SIZE: usize = 4096;
 static mut CHILD_STACK: *const [u64; CHILD_STACK_SIZE] = &[0; CHILD_STACK_SIZE];
 
-pub fn init(allocator: &mut Allocator, fault_ep_cap: seL4_CPtr) {
+pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     debug_println!("feL4 app init");
 
     let tcb_obj = allocator.vka_alloc_tcb().unwrap();
@@ -50,16 +53,58 @@ pub fn init(allocator: &mut Allocator, fault_ep_cap: seL4_CPtr) {
     let pd_cap = seL4_CapInitThreadVSpace;
     let cspace_cap = seL4_CapInitThreadCNode;
 
+    // get a frame cap for the IPC buffer
+    let ipc_frame_obj = allocator
+        .vka_alloc_frame(THREAD_IPC_BUFFER_FRAME_SIZE_BITS)
+        .unwrap();
+    let ipc_frame_cap = ipc_frame_obj.cptr;
+
+    // TESTING
+    let ipc_buffer_vaddr: seL4_Word = 0x0700_0000;
+
+    // create a IPC buffer and capability for it
+    //let ipc_buffer = allocator.vspace_new_ipc_buffer(
+    allocator
+        .map_page(
+            ipc_frame_cap,
+            ipc_buffer_vaddr,
+            unsafe { seL4_CapRights_new(1, 1, 1) },
+            seL4_ARM_VMAttributes_seL4_ARM_Default_VMAttributes,
+        ).unwrap();
+
+    // set the IPC buffer's virtual address in a field of the IPC buffer
+    let ipc_buffer: *mut seL4_IPCBuffer = ipc_buffer_vaddr as _;
+    unsafe { (*ipc_buffer).userData = ipc_buffer_vaddr };
+
+    // allocate a cspace slot for the fault endpoint
+    let fault_ep_cap = allocator.vka_cspace_alloc().unwrap();
+
+    // create a badged fault endpoint for the thread
+    let err: seL4_Error = unsafe {
+        seL4_CNode_Mint(
+            cspace_cap,
+            fault_ep_cap,
+            seL4_WordBits as _,
+            cspace_cap,
+            global_fault_ep_cap,
+            seL4_WordBits as _,
+            seL4_CapRights_new(1, 1, 1),
+            FAULT_EP_BADGE,
+        )
+    };
+    assert!(err == 0, "Failed to mint a copy of the fault endpoint");
+
+    // TODO - finish up
     let tcb_err: seL4_Error = unsafe {
         seL4_TCB_Configure(
             tcb_cap,
-            seL4_CapNull.into(),
+            fault_ep_cap,
             cspace_cap.into(),
             seL4_NilData.into(),
             pd_cap.into(),
             seL4_NilData.into(),
-            0,
-            0,
+            ipc_buffer_vaddr,
+            ipc_frame_cap,
         )
     };
 

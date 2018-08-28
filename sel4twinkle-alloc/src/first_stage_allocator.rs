@@ -25,6 +25,8 @@ impl Allocator {
             self.add_root_untyped_item(
                 bootinfo.untyped.start + i,
                 bootinfo.untypedList[i as usize].sizeBits as _,
+                bootinfo.untypedList[i as usize].paddr,
+                bootinfo.untypedList[i as usize].isDevice != 0,
             );
         }
     }

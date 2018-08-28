@@ -11,7 +11,7 @@ impl Allocator {
         let size_bits = self.vka_get_object_size(item_type, item_size);
 
         // Allocate an untyped memory item of the right size
-        let untyped_mem = self.alloc_untyped(size_bits)?;
+        let untyped_mem = self.alloc_untyped(size_bits, None, false)?;
 
         // Allocate an object
         let cap_range = self.retype_untyped_memory(untyped_mem, item_type, item_size, 1)?;

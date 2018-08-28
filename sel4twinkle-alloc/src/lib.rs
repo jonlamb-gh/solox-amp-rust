@@ -8,7 +8,7 @@
 ///
 extern crate sel4_sys;
 
-use sel4_sys::seL4_CPtr;
+use sel4_sys::{seL4_CPtr, seL4_Word};
 
 mod allocator;
 mod cspacepath;
@@ -16,6 +16,7 @@ mod first_stage_allocator;
 mod object_allocator;
 mod vka;
 mod vka_object;
+mod vspace;
 
 pub const MIN_UNTYPED_SIZE: usize = 4;
 pub const MAX_UNTYPED_SIZE: usize = 32;
@@ -35,6 +36,8 @@ pub enum Error {
 pub struct UntypedItem {
     cap: seL4_CPtr,
     size_bits: usize,
+    paddr: seL4_Word,
+    is_device: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -50,6 +53,10 @@ struct InitUntypedItem {
 }
 
 pub struct Allocator {
+    /// Root page directory for our vspace
+    page_directory: seL4_CPtr,
+    page_table: seL4_CPtr,
+
     /// CNode we allocate from
     root_cnode: seL4_CPtr,
     root_cnode_depth: seL4_CPtr,
