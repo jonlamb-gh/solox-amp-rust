@@ -21,9 +21,12 @@ mod vspace;
 pub const MIN_UNTYPED_SIZE: usize = 4;
 pub const MAX_UNTYPED_SIZE: usize = 32;
 
+// TODO - pull from configs
 pub const MAX_UNTYPED_ITEMS: usize = 256;
 
-pub const VKA_NO_PADDR: u32 = 0;
+pub const VKA_NO_PADDR: seL4_Word = 0;
+
+pub const VSPACE_START: seL4_Word = 0x1000_0000;
 
 // TODO - should be derived from libsel4-sys?
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,6 +59,7 @@ pub struct Allocator {
     /// Root page directory for our vspace
     page_directory: seL4_CPtr,
     page_table: seL4_CPtr,
+    last_allocated: seL4_Word,
 
     /// CNode we allocate from
     root_cnode: seL4_CPtr,

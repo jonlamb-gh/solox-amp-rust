@@ -1,4 +1,6 @@
 // NOTE: this is not a proper vspace impl, just a testing area for now
+// TODO - device support
+// TODO - derive clone for CapRights
 
 // https://github.com/seL4/seL4_libs/blob/master/libsel4vspace/include/vspace/vspace.h
 // https://github.com/seL4/seL4_libs/blob/master/libsel4utils/src/vspace/vspace.c
@@ -7,56 +9,97 @@
 
 // https://github.com/seL4/seL4_libs/blob/master/libsel4platsupport/src/io.c#L206
 
-use super::{Allocator, Error};
+use super::{Allocator, Error, VSPACE_START};
 use sel4_sys::*;
 
 impl Allocator {
     pub fn bootstrap_vspace(&mut self, pd_cap: seL4_CPtr) -> Result<(), Error> {
         // set our vspace root page directory
         self.page_directory = pd_cap;
+        self.last_allocated = VSPACE_START;
+        Ok(())
+    }
 
-        // TODO - this is leaky
-        // create a page table
-        //let pt_obj = self.vka_alloc_page_table()?;
-        //self.page_table = pt_obj.cptr;
+    pub fn vspace_new_ipc_buffer(
+        &mut self,
+        cap: Option<&mut seL4_CPtr>,
+    ) -> Result<seL4_Word, Error> {
+        self.vspace_new_pages(
+            1,
+            seL4_PageBits as _,
+            unsafe { seL4_CapRights_new(1, 1, 1) },
+            seL4_ARM_VMAttributes_seL4_ARM_Default_VMAttributes,
+            cap,
+        )
+    }
+
+    pub fn vspace_new_pages(
+        &mut self,
+        num_pages: usize,
+        size_bits: usize,
+        _rights: seL4_CapRights,
+        cache_attributes: seL4_ARM_VMAttributes,
+        cap: Option<&mut seL4_CPtr>,
+    ) -> Result<seL4_Word, Error> {
+        let vaddr = self.last_allocated;
+
+        self.vspace_new_pages_at_vaddr(
+            vaddr,
+            num_pages,
+            size_bits,
+            //_rights,
+            unsafe { seL4_CapRights_new(1, 1, 1) },
+            cache_attributes,
+            false,
+            cap,
+        )?;
+
+        self.last_allocated += num_pages as seL4_Word * (1 << size_bits) as seL4_Word;
+
+        Ok(vaddr)
+    }
+
+    pub fn vspace_new_pages_at_vaddr(
+        &mut self,
+        vaddr: seL4_Word,
+        num_pages: usize,
+        size_bits: usize,
+        _rights: seL4_CapRights,
+        cache_attributes: seL4_ARM_VMAttributes,
+        _can_use_dev: bool,
+        cap: Option<&mut seL4_CPtr>,
+    ) -> Result<(), Error> {
+        assert_eq!(size_bits, seL4_PageBits as usize);
+
+        let mut page_vaddr = vaddr;
+        let mut first_cap: seL4_CPtr = 0;
+
+        for page in 0..num_pages {
+            let frame_obj = self.vka_alloc_frame(size_bits)?;
+
+            self.map_page(
+                frame_obj.cptr,
+                page_vaddr,
+                //rights,
+                unsafe { seL4_CapRights_new(1, 1, 1) },
+                cache_attributes,
+            )?;
+
+            if page == 0 {
+                first_cap = frame_obj.cptr;
+            }
+
+            page_vaddr += 1 << size_bits;
+        }
+
+        // provide cap to the first frame
+        if let Some(cap) = cap {
+            *cap = first_cap;
+        }
 
         Ok(())
     }
 
-    /*
-    pub fn vspace_new_ipc_buffer(&self) -> Result<seL4_CPtr, Error> {
-        void *vaddr = vspace_new_pages(vspace, seL4_AllRights, 1, seL4_PageBits);
-
-        if (vaddr == NULL) {
-            return NULL;
-        }
-
-        *page = vspace_get_cap(vspace, vaddr);
-
-        return vaddr;
-    }
-    */
-
-    //pub fn vspace_new_pages_at_vaddr() {
-    // for each page
-    //   vka alloc frame
-    //   map_page
-    //   vaddr += size...
-
-    //pub fn vspace_map_pages_at_vaddr()
-    //assert_neq!(size_bits, seL4_PageBits);
-
-    //#define KERNEL_RESERVED_START 0xE0000000
-    //#define VSPACE_MAP_PAGING_OBJECTS 2
-    //#define VSPACE_LEVEL_BITS 10
-    //#define VSPACE_NUM_LEVELS 2
-
-    // VSPACE_RESERVE_START = (KERNEL_RESERVED_START - VSPACE_RESERVE_SIZE)
-    // data->last_allocated = 0x10000000;
-
-    // seL4_ARM_VMAttributes_seL4_ARM_Default_VMAttributes:
-
-    // TODO - derive clone for CapRights
     pub fn map_page(
         &mut self,
         cap: seL4_CPtr,

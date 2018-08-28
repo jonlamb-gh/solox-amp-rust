@@ -38,11 +38,9 @@ extern "C" {
 
 const FAULT_EP_BADGE: seL4_Word = 0xBEEF;
 
-/// use a 4K frame for the IPC buffer
-const THREAD_IPC_BUFFER_FRAME_SIZE_BITS: usize = 12;
-
-const CHILD_STACK_SIZE: usize = 4096;
-static mut CHILD_STACK: *const [u64; CHILD_STACK_SIZE] = &[0; CHILD_STACK_SIZE];
+// thread stack size in bytes or u64's?
+const THREAD_STACK_SIZE: usize = 4096;
+static mut THREAD_STACK: *const [u64; THREAD_STACK_SIZE] = &[0; THREAD_STACK_SIZE];
 
 pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     debug_println!("feL4 app init");
@@ -53,24 +51,11 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     let pd_cap = seL4_CapInitThreadVSpace;
     let cspace_cap = seL4_CapInitThreadCNode;
 
-    // get a frame cap for the IPC buffer
-    let ipc_frame_obj = allocator
-        .vka_alloc_frame(THREAD_IPC_BUFFER_FRAME_SIZE_BITS)
-        .unwrap();
-    let ipc_frame_cap = ipc_frame_obj.cptr;
-
-    // TESTING
-    let ipc_buffer_vaddr: seL4_Word = 0x0700_0000;
-
     // create a IPC buffer and capability for it
-    //let ipc_buffer = allocator.vspace_new_ipc_buffer(
-    allocator
-        .map_page(
-            ipc_frame_cap,
-            ipc_buffer_vaddr,
-            unsafe { seL4_CapRights_new(1, 1, 1) },
-            seL4_ARM_VMAttributes_seL4_ARM_Default_VMAttributes,
-        ).unwrap();
+    let mut ipc_frame_cap: seL4_CPtr = 0;
+    let ipc_buffer_vaddr = allocator
+        .vspace_new_ipc_buffer(Some(&mut ipc_frame_cap))
+        .unwrap();
 
     // set the IPC buffer's virtual address in a field of the IPC buffer
     let ipc_buffer: *mut seL4_IPCBuffer = ipc_buffer_vaddr as _;
@@ -110,15 +95,38 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
 
     assert!(tcb_err == 0, "Failed to configure TCB");
 
-    let stack_base = unsafe { CHILD_STACK as usize };
-    let stack_top = stack_base + CHILD_STACK_SIZE;
+    let stack_alignment_requirement: usize = (seL4_WordBits as usize / 8) * 2;
+
+    assert!(THREAD_STACK_SIZE >= 512, "Thread stack size is too small");
+    assert!(
+        THREAD_STACK_SIZE % stack_alignment_requirement == 0,
+        "Thread stack is not properly aligned to a {} byte boundary",
+        stack_alignment_requirement
+    );
+
+    let stack_base = unsafe { THREAD_STACK as usize };
+    let stack_top = stack_base + THREAD_STACK_SIZE;
+
+    assert!(
+        stack_top % stack_alignment_requirement == 0,
+        "Thread stack is not properly aligned to a {} byte boundary",
+        stack_alignment_requirement
+    );
+
     let mut regs: seL4_UserContext = unsafe { mem::zeroed() };
+
+    // only 2 registers
     regs.pc = thread_run as seL4_Word;
     regs.sp = stack_top as seL4_Word;
 
-    let _: u32 = unsafe { seL4_TCB_WriteRegisters(tcb_cap, 0, 0, 2, &mut regs) };
-    let _: u32 = unsafe { seL4_TCB_SetPriority(tcb_cap, seL4_CapInitThreadTCB.into(), 255) };
-    let _: u32 = unsafe { seL4_TCB_Resume(tcb_cap) };
+    let err: u32 = unsafe { seL4_TCB_WriteRegisters(tcb_cap, 0, 0, 2, &mut regs) };
+    assert!(err == 0, "Failed to write TCB registers");
+
+    let err: u32 = unsafe { seL4_TCB_SetPriority(tcb_cap, seL4_CapInitThreadTCB.into(), 255) };
+    assert!(err == 0, "Failed to set TCB priority");
+
+    let err: u32 = unsafe { seL4_TCB_Resume(tcb_cap) };
+    assert!(err == 0, "Failed to start thread");
 }
 
 pub fn handle_fault(badge: seL4_Word) {
