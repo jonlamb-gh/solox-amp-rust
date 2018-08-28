@@ -191,7 +191,8 @@ fn main() {
         let mut badge: seL4_Word = 0;
 
         let _msg_tag = unsafe { seL4_Wait(fault_ep_cap, &mut badge) };
-        panic!("root-task got notification - badge 0x{:X}", badge);
+
+        solox::handle_fault(badge);
     }
 }
 

@@ -121,6 +121,10 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     let _: u32 = unsafe { seL4_TCB_Resume(tcb_cap) };
 }
 
+pub fn handle_fault(badge: seL4_Word) {
+    debug_println!("!!! Fault from badge 0x{:X}", badge);
+}
+
 pub fn thread_run() {
     debug_println!("\nhello from a feL4 thread!\n");
 
