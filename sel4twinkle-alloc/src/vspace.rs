@@ -66,8 +66,6 @@ impl Allocator {
         _can_use_dev: bool,
         cap: Option<&mut seL4_CPtr>,
     ) -> Result<(seL4_Word), Error> {
-        assert_eq!(size_bits, seL4_PageBits as usize);
-
         let vaddr = self.last_allocated;
         let mut page_vaddr = vaddr;
         let mut first_cap: seL4_CPtr = 0;

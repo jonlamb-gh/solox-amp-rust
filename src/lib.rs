@@ -53,11 +53,9 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     let cspace_cap = seL4_CapInitThreadCNode;
 
     // map in device frames
-    // TODO - size SRC_SIZE/SRC_SIZE_BITS
-    let src_vaddr = allocator.io_map(SRC_PADDR, 1, seL4_PageBits as _).unwrap();
-    let ccm_vaddr = allocator.io_map(CCM_PADDR, 1, seL4_PageBits as _).unwrap();
-    let tcm_num_pages = M4_TCM_SIZE / (1 << seL4_PageBits);
-    let tcm_vaddr = allocator.io_map(M4_TCM_PADDR, tcm_num_pages, seL4_PageBits as _).unwrap();
+    let src_vaddr = allocator.io_map(SRC_PADDR, SRC_SIZE_BITS).unwrap();
+    let ccm_vaddr = allocator.io_map(CCM_PADDR, CCM_SIZE_BITS).unwrap();
+    let tcm_vaddr = allocator.io_map(M4_TCM_PADDR, M4_TCM_SIZE_BITS).unwrap();
 
     // create a IPC buffer and capability for it
     let mut ipc_frame_cap: seL4_CPtr = 0;
@@ -162,9 +160,21 @@ pub struct ThreadData {
 pub fn thread_run(thread_data: &ThreadData) {
     debug_println!("\nhello from a feL4 thread!\n");
 
-    debug_println!("SRC paddr = 0x{:X} -- vaddr = 0x{:X}", SRC_PADDR, thread_data.src_vaddr);
-    debug_println!("CCM paddr = 0x{:X} -- vaddr = 0x{:X}", CCM_PADDR, thread_data.ccm_vaddr);
-    debug_println!("TCM paddr = 0x{:X} -- vaddr = 0x{:X}", M4_TCM_PADDR, thread_data.tcm_vaddr);
+    debug_println!(
+        "SRC paddr = 0x{:X} -- vaddr = 0x{:X}",
+        SRC_PADDR,
+        thread_data.src_vaddr
+    );
+    debug_println!(
+        "CCM paddr = 0x{:X} -- vaddr = 0x{:X}",
+        CCM_PADDR,
+        thread_data.ccm_vaddr
+    );
+    debug_println!(
+        "TCM paddr = 0x{:X} -- vaddr = 0x{:X}",
+        M4_TCM_PADDR,
+        thread_data.tcm_vaddr
+    );
 
     // construct CPIO pointers, symbols are from our ELF file
     let cpio_archive: *const u8 = unsafe { &_cpio_archive };
@@ -177,10 +187,7 @@ pub fn thread_run(thread_data: &ThreadData) {
     // get first CPIO entry, should be our M4 binary file
     let m4_bin_fw_cpio_file = cpio_reader.parse_entry();
 
-    debug_println!(
-        "parsed CPIO entry '{}'\n",
-        m4_bin_fw_cpio_file.file_name(),
-    );
+    debug_println!("parsed CPIO entry '{}'\n", m4_bin_fw_cpio_file.file_name(),);
 
     // upload the M4 binary from the CPIO file and start the M4 core
     upload_and_run_m4_binary(
@@ -206,7 +213,7 @@ fn upload_and_run_m4_binary(
     // enable M4 clock
     unsafe { ptr::write_volatile(ccm_ccgr3_ptr, ptr::read_volatile(ccm_ccgr3_ptr) | (3 << 2)) };
 
-    debug_println!("copying M4 binary to TCM");
+    debug_println!("copying M4 binary to TCM - {} bytes", cpio_file.file_size());
 
     // copy the binary to the M4 memory region
     unsafe {

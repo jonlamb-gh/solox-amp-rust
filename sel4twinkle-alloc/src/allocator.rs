@@ -189,7 +189,7 @@ impl Allocator {
         // Do we have something of the correct size in initial memory regions?
         for i in 0..self.num_init_untyped_items {
             if self.init_untyped_items[i].is_free
-                && (self.init_untyped_items[i].item.size_bits == size_bits)
+                && (self.init_untyped_items[i].item.size_bits >= size_bits)
             {
                 let mut consume = false;
 
