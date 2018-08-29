@@ -4,7 +4,6 @@
 #![cfg_attr(feature = "alloc", feature(alloc))]
 #![feature(lang_items, core_intrinsics)]
 #![feature(global_asm)]
-#![cfg_attr(feature = "alloc", feature(global_allocator))]
 #![feature(panic_implementation)]
 #![feature(panic_info_message)]
 

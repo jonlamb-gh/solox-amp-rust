@@ -51,18 +51,45 @@ impl Allocator {
         self.vka_alloc_object(_object_seL4_ARM_SmallPageObject, size_bits)
     }
 
+    pub fn vka_alloc_frame_at(
+        &mut self,
+        size_bits: usize,
+        paddr: seL4_Word,
+    ) -> Result<VkaObject, Error> {
+        self.vka_alloc_object_at(_object_seL4_ARM_SmallPageObject, size_bits, paddr)
+    }
+
     pub fn vka_alloc_page_table(&mut self) -> Result<VkaObject, Error> {
         self.vka_alloc_object(_object_seL4_ARM_PageTableObject, seL4_PageTableBits as _)
+    }
+
+    pub fn vka_alloc_object(
+        &mut self,
+        obj_type: seL4_Word,
+        size_bits: usize,
+    ) -> Result<VkaObject, Error> {
+        self.alloc_object_at_maybe_dev(obj_type, size_bits, None, false)
+    }
+
+    pub fn vka_alloc_object_at(
+        &mut self,
+        obj_type: seL4_Word,
+        size_bits: usize,
+        paddr: seL4_Word,
+    ) -> Result<VkaObject, Error> {
+        self.alloc_object_at_maybe_dev(obj_type, size_bits, Some(paddr), true)
     }
 
     /// Generic object allocator.
     /// TODO - use latest from seL4, this is from SMACCM repo
     /// https://github.com/smaccm/seL4_libs/blob/master/libsel4vka/include/vka/object.h#L38
     /// https://github.com/seL4/seL4_libs/blob/master/libsel4vka/include/vka/object.h#L75
-    pub fn vka_alloc_object(
+    fn alloc_object_at_maybe_dev(
         &mut self,
         obj_type: seL4_Word,
         size_bits: usize,
+        paddr: Option<seL4_Word>,
+        can_use_dev: bool,
     ) -> Result<VkaObject, Error> {
         let mut result: VkaObject = VkaObject::new();
 
@@ -70,7 +97,12 @@ impl Allocator {
 
         let path = self.vka_cspace_make_path(result.cptr);
 
-        result.ut = self.vka_utspace_alloc(&path, obj_type, size_bits)?;
+        if let Some(paddr) = paddr {
+            result.ut =
+                self.vka_utspace_alloc_at(&path, obj_type, size_bits, paddr, can_use_dev)?;
+        } else {
+            result.ut = self.vka_utspace_alloc(&path, obj_type, size_bits)?;
+        }
 
         result.item_type = obj_type;
         result.size_bits = size_bits as _;

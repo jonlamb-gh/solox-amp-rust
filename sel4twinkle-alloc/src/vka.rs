@@ -71,6 +71,26 @@ impl Allocator {
         }
     }
 
+    pub fn vka_utspace_alloc(
+        &mut self,
+        dest: &CSpacePath,
+        item_type: seL4_Word,
+        size_bits: usize,
+    ) -> Result<seL4_CPtr, Error> {
+        self.utspace_alloc(dest, item_type, size_bits, None, false)
+    }
+
+    pub fn vka_utspace_alloc_at(
+        &mut self,
+        dest: &CSpacePath,
+        item_type: seL4_Word,
+        size_bits: usize,
+        paddr: seL4_Word,
+        can_use_dev: bool,
+    ) -> Result<seL4_CPtr, Error> {
+        self.utspace_alloc(dest, item_type, size_bits, Some(paddr), can_use_dev)
+    }
+
     fn utspace_alloc(
         &mut self,
         dest: &CSpacePath,
@@ -102,25 +122,5 @@ impl Allocator {
         } else {
             Err(Error::ResourceExhausted)
         }
-    }
-
-    pub fn vka_utspace_alloc(
-        &mut self,
-        dest: &CSpacePath,
-        item_type: seL4_Word,
-        size_bits: usize,
-    ) -> Result<seL4_CPtr, Error> {
-        self.utspace_alloc(dest, item_type, size_bits, None, false)
-    }
-
-    pub fn vka_utspace_alloc_at(
-        &mut self,
-        dest: &CSpacePath,
-        item_type: seL4_Word,
-        size_bits: usize,
-        paddr: seL4_Word,
-        can_use_dev: bool,
-    ) -> Result<seL4_CPtr, Error> {
-        self.utspace_alloc(dest, item_type, size_bits, Some(paddr), can_use_dev)
     }
 }

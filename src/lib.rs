@@ -21,6 +21,7 @@ mod macros;
 mod cpio;
 mod devices;
 
+use alloc::boxed::Box;
 use core::mem;
 use core::ptr;
 use devices::*;
@@ -51,6 +52,13 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     let pd_cap = seL4_CapInitThreadVSpace;
     let cspace_cap = seL4_CapInitThreadCNode;
 
+    // map in device frames
+    // TODO - size SRC_SIZE/SRC_SIZE_BITS
+    let src_vaddr = allocator.io_map(SRC_PADDR, 1, seL4_PageBits as _).unwrap();
+    let ccm_vaddr = allocator.io_map(CCM_PADDR, 1, seL4_PageBits as _).unwrap();
+    let tcm_num_pages = M4_TCM_SIZE / (1 << seL4_PageBits);
+    let tcm_vaddr = allocator.io_map(M4_TCM_PADDR, tcm_num_pages, seL4_PageBits as _).unwrap();
+
     // create a IPC buffer and capability for it
     let mut ipc_frame_cap: seL4_CPtr = 0;
     let ipc_buffer_vaddr = allocator
@@ -79,7 +87,6 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
     };
     assert!(err == 0, "Failed to mint a copy of the fault endpoint");
 
-    // TODO - finish up
     let tcb_err: seL4_Error = unsafe {
         seL4_TCB_Configure(
             tcb_cap,
@@ -115,11 +122,23 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
 
     let mut regs: seL4_UserContext = unsafe { mem::zeroed() };
 
-    // only 2 registers
+    // leak some memory off the global array-backed allocator for
+    // the thread data
+    // NOTE: using the allocator makes our binaries much bigger
+    let thread_data_box: Box<ThreadData> = Box::new(ThreadData {
+        src_vaddr,
+        ccm_vaddr,
+        tcm_vaddr,
+    });
+
+    // pointer provided through r0
+    regs.r0 = Box::leak(thread_data_box) as *const _ as seL4_Word;
+
+    // pc, sp, cpsr, r0 = 4
     regs.pc = thread_run as seL4_Word;
     regs.sp = stack_top as seL4_Word;
 
-    let err: u32 = unsafe { seL4_TCB_WriteRegisters(tcb_cap, 0, 0, 2, &mut regs) };
+    let err: u32 = unsafe { seL4_TCB_WriteRegisters(tcb_cap, 0, 0, 4, &mut regs) };
     assert!(err == 0, "Failed to write TCB registers");
 
     let err: u32 = unsafe { seL4_TCB_SetPriority(tcb_cap, seL4_CapInitThreadTCB.into(), 255) };
@@ -133,8 +152,19 @@ pub fn handle_fault(badge: seL4_Word) {
     debug_println!("!!! Fault from badge 0x{:X}", badge);
 }
 
-pub fn thread_run() {
+#[derive(Debug)]
+pub struct ThreadData {
+    pub src_vaddr: seL4_Word,
+    pub ccm_vaddr: seL4_Word,
+    pub tcm_vaddr: seL4_Word,
+}
+
+pub fn thread_run(thread_data: &ThreadData) {
     debug_println!("\nhello from a feL4 thread!\n");
+
+    debug_println!("SRC paddr = 0x{:X} -- vaddr = 0x{:X}", SRC_PADDR, thread_data.src_vaddr);
+    debug_println!("CCM paddr = 0x{:X} -- vaddr = 0x{:X}", CCM_PADDR, thread_data.ccm_vaddr);
+    debug_println!("TCM paddr = 0x{:X} -- vaddr = 0x{:X}", M4_TCM_PADDR, thread_data.tcm_vaddr);
 
     // construct CPIO pointers, symbols are from our ELF file
     let cpio_archive: *const u8 = unsafe { &_cpio_archive };
@@ -142,25 +172,22 @@ pub fn thread_run() {
 
     let cpio_reader = cpio::Reader::new(cpio_archive, cpio_archive_size);
 
-    debug_println!("created new CPIO reader\n{:#?}", cpio_reader);
+    debug_println!("\ncreated new CPIO reader\n{:#?}\n", cpio_reader);
 
     // get first CPIO entry, should be our M4 binary file
     let m4_bin_fw_cpio_file = cpio_reader.parse_entry();
 
     debug_println!(
-        "parsed CPIO entry '{}'\n{:#?}",
+        "parsed CPIO entry '{}'\n",
         m4_bin_fw_cpio_file.file_name(),
-        m4_bin_fw_cpio_file
     );
-
-    // TODO - this will fault, need to map in the device frames to back the vaddr's
 
     // upload the M4 binary from the CPIO file and start the M4 core
     upload_and_run_m4_binary(
         &m4_bin_fw_cpio_file,
-        mut_u32_ptr(SRC_VADDR + SRC_SCR_OFFSET),
-        mut_u32_ptr(CCM_VADDR + CCM_CCGR3_OFFSET),
-        mut_u32_ptr(M4_TCM_VADDR),
+        mut_u32_ptr(thread_data.src_vaddr + SRC_SCR_OFFSET),
+        mut_u32_ptr(thread_data.ccm_vaddr + CCM_CCGR3_OFFSET),
+        mut_u32_ptr(thread_data.tcm_vaddr),
     );
 
     debug_println!("\nthread work all done, sitting on loop");

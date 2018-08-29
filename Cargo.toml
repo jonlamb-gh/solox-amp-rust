@@ -23,6 +23,6 @@ features = ["alloc", "nightly"]
 optional = true
 
 [features]
-default = []
+default = ["alloc"]
 alloc = ["wee_alloc"]
 test = ["alloc", "proptest"]

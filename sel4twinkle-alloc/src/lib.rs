@@ -13,6 +13,7 @@ use sel4_sys::{seL4_CPtr, seL4_Word};
 mod allocator;
 mod cspacepath;
 mod first_stage_allocator;
+mod io_map;
 mod object_allocator;
 mod vka;
 mod vka_object;
@@ -26,7 +27,7 @@ pub const MAX_UNTYPED_ITEMS: usize = 256;
 
 pub const VKA_NO_PADDR: seL4_Word = 0;
 
-pub const VSPACE_START: seL4_Word = 0x1000_0000;
+const VSPACE_START: seL4_Word = 0x1000_0000;
 
 // TODO - should be derived from libsel4-sys?
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

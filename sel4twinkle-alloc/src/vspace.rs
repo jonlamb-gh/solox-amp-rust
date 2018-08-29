@@ -1,6 +1,8 @@
 // NOTE: this is not a proper vspace impl, just a testing area for now
-// TODO - device support
-// TODO - derive clone for CapRights
+// TODO
+// - device support
+// - derive clone for CapRights
+// - get_cap(vaddr) fn to replace awkward Option<&mut seL4_CPtr> usage
 
 // https://github.com/seL4/seL4_libs/blob/master/libsel4vspace/include/vspace/vspace.h
 // https://github.com/seL4/seL4_libs/blob/master/libsel4utils/src/vspace/vspace.c
@@ -41,10 +43,8 @@ impl Allocator {
         cache_attributes: seL4_ARM_VMAttributes,
         cap: Option<&mut seL4_CPtr>,
     ) -> Result<seL4_Word, Error> {
-        let vaddr = self.last_allocated;
-
-        self.vspace_new_pages_at_vaddr(
-            vaddr,
+        self.vspace_new_pages_at(
+            None,
             num_pages,
             size_bits,
             //_rights,
@@ -52,30 +52,36 @@ impl Allocator {
             cache_attributes,
             false,
             cap,
-        )?;
-
-        self.last_allocated += num_pages as seL4_Word * (1 << size_bits) as seL4_Word;
-
-        Ok(vaddr)
+        )
     }
 
-    pub fn vspace_new_pages_at_vaddr(
+    // this doesn't work for multiple pages yet
+    pub fn vspace_new_pages_at(
         &mut self,
-        vaddr: seL4_Word,
+        paddr: Option<seL4_Word>,
         num_pages: usize,
         size_bits: usize,
         _rights: seL4_CapRights,
         cache_attributes: seL4_ARM_VMAttributes,
         _can_use_dev: bool,
         cap: Option<&mut seL4_CPtr>,
-    ) -> Result<(), Error> {
+    ) -> Result<(seL4_Word), Error> {
         assert_eq!(size_bits, seL4_PageBits as usize);
 
+        let vaddr = self.last_allocated;
         let mut page_vaddr = vaddr;
         let mut first_cap: seL4_CPtr = 0;
 
         for page in 0..num_pages {
-            let frame_obj = self.vka_alloc_frame(size_bits)?;
+            let frame_obj = if let Some(paddr) = paddr {
+                if page == 0 {
+                    self.vka_alloc_frame_at(size_bits, paddr)?
+                } else {
+                    self.vka_alloc_frame(size_bits)?
+                }
+            } else {
+                self.vka_alloc_frame(size_bits)?
+            };
 
             self.map_page(
                 frame_obj.cptr,
@@ -97,10 +103,12 @@ impl Allocator {
             *cap = first_cap;
         }
 
-        Ok(())
+        self.last_allocated += num_pages as seL4_Word * (1 << size_bits) as seL4_Word;
+
+        Ok(vaddr)
     }
 
-    pub fn map_page(
+    fn map_page(
         &mut self,
         cap: seL4_CPtr,
         vaddr: seL4_Word,
