@@ -22,6 +22,8 @@ A bare metal Rust cortex-m project runs on the M4 core.
 
 ## Building
 
+** REQUIRES a cargo-fel4 that doesn't overwrite the root-task.rs **
+
 Note that the L2 cache memory is currently defined as OCRAM for the M4 core.
 
 Modify U-boot environment:
