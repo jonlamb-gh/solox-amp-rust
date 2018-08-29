@@ -1,4 +1,3 @@
-// TODO - the virtual addresses are arbitrary but free locations
 // TODO - construct a basic SVD file
 #![allow(unused)]
 
@@ -13,20 +12,17 @@ pub const DDR_SIZE: usize = 1 << 16;
 
 // M4 TCM(L) - 8 pages, 32 KB
 pub const M4_TCM_PADDR: seL4_Word = 0x007F_8000;
-pub const M4_TCM_VADDR: seL4_Word = 0x0700_8000;
 pub const M4_TCM_SIZE: usize = 8 * (1 << seL4_PageBits as usize);
 pub const M4_TCM_SIZE_BITS: usize = 15;
 
 // SRC, first page for SRC_SCR
 pub const SRC_PADDR: seL4_Word = 0x020D_8000;
-pub const SRC_VADDR: seL4_Word = 0x0700_0000;
 pub const SRC_SIZE: usize = 1 << seL4_PageBits as usize;
 pub const SRC_SIZE_BITS: usize = seL4_PageBits as usize;
 pub const SRC_SCR_OFFSET: seL4_Word = 0;
 
 // CCM, first page for CCGR3
 pub const CCM_PADDR: seL4_Word = 0x020C_4000;
-pub const CCM_VADDR: seL4_Word = 0x0700_4000;
 pub const CCM_SIZE: usize = 1 << seL4_PageBits as usize;
 pub const CCM_SIZE_BITS: usize = seL4_PageBits as usize;
 pub const CCM_CCGR3_OFFSET: seL4_Word = 0x74;

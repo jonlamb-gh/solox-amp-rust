@@ -1,4 +1,6 @@
 /target
 **/*.rs.bk
 /artifacts
-src/bin/root-task.rs
+
+# tracked for now
+#src/bin/root-task.rs

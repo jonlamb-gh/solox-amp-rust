@@ -8,6 +8,8 @@ authors = ["jonlamb-gh <lamb.jon.io@gmail.com>"]
 #libsel4-sys = {git = "https://github.com/jonlamb-gh/libsel4-sys.git", branch = "devel"}
 libsel4-sys = {path = "libsel4-sys"}
 rlibc = "1.0"
+# TODO - move to a real repo
+sel4twinkle-alloc = {path = "sel4twinkle-alloc"}
 
 [dependencies.wee_alloc]
 version = "0.4"
@@ -21,6 +23,6 @@ features = ["alloc", "nightly"]
 optional = true
 
 [features]
-default = []
+default = ["alloc"]
 alloc = ["wee_alloc"]
 test = ["alloc", "proptest"]

@@ -297,6 +297,13 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "sel4twinkle-alloc"
+version = "0.0.1"
+dependencies = [
+ "libsel4-sys 0.5.1",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -308,6 +315,7 @@ dependencies = [
  "libsel4-sys 0.5.1",
  "proptest 0.8.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sel4twinkle-alloc 0.0.1",
  "wee_alloc 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
