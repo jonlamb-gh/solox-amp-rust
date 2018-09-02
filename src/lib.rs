@@ -147,7 +147,7 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
 }
 
 pub fn handle_fault(badge: seL4_Word) {
-    debug_println!("!!! Fault from badge 0x{:X}", badge);
+    debug_println!("\n!!! Fault from badge 0x{:X}\n", badge);
 }
 
 #[derive(Debug)]
@@ -197,8 +197,12 @@ pub fn thread_run(thread_data: &ThreadData) {
         mut_u32_ptr(thread_data.tcm_vaddr),
     );
 
-    debug_println!("\nthread work all done, sitting on loop");
+    debug_println!("\nthread work all done, going to fault now");
 
+    // this should fault, root-task will call our handler
+    unsafe { ptr::write_volatile(0 as _, 0) };
+
+    // shouldn't get here
     loop {}
 }
 

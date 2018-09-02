@@ -22,7 +22,9 @@ A bare metal Rust cortex-m project runs on the M4 core.
 
 ## Building
 
-** REQUIRES a cargo-fel4 that doesn't overwrite the root-task.rs **
+** REQUIRES a cargo-fel4 that doesn't overwrite the src/bin/root-task.rs file **
+
+Here's a [branch](https://github.com/maindotrs/cargo-fel4/tree/keep-root-rask-for-development) I use.
 
 Note that the L2 cache memory is currently defined as OCRAM for the M4 core.
 
@@ -117,7 +119,9 @@ copying M4 binary to TCM - 3044 bytes
 enabling and starting the M4 core
 waiting for SRC_SCR reset auto-clear (bit 3) to clear
 
-thread work all done, sitting on loop
+thread work all done, going to fault now
+
+!!! Fault from badge 0xBEEF
 ```
 
 On UART2 (M4) console:

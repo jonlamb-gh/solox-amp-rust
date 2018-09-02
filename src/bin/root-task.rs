@@ -75,7 +75,7 @@ pub mod sel4_config {
     pub const KernelDebugBuild: bool = true;
 }
 
-pub static mut BOOTINFO: *mut seL4_BootInfo = (0 as *mut seL4_BootInfo);
+static mut BOOTINFO: *mut seL4_BootInfo = (0 as *mut seL4_BootInfo);
 static mut RUN_ONCE: bool = false;
 
 #[no_mangle]
