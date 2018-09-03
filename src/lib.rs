@@ -39,8 +39,8 @@ extern "C" {
 
 const FAULT_EP_BADGE: seL4_Word = 0xBEEF;
 
-// thread stack size in bytes or u64's?
-const THREAD_STACK_SIZE: usize = 4096;
+// 4096 bytes
+const THREAD_STACK_SIZE: usize = 512;
 static mut THREAD_STACK: *const [u64; THREAD_STACK_SIZE] = &[0; THREAD_STACK_SIZE];
 
 pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
