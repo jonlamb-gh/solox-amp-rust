@@ -228,9 +228,9 @@ fn upload_and_run_m4_binary(
         );
     }
 
-    debug_println!("enabling and starting the M4 core");
+    debug_println!("starting the M4 core");
 
-    // enable M4 and assert soft reset
+    // enable M4 and assert reset
     unsafe {
         ptr::write_volatile(
             src_scr_ptr,
@@ -241,8 +241,8 @@ fn upload_and_run_m4_binary(
     // release the reset, starting the M4
     unsafe { ptr::write_volatile(src_scr_ptr, ptr::read_volatile(src_scr_ptr) & !(1 << 4)) };
 
-    debug_println!("waiting for SRC_SCR reset auto-clear (bit 3) to clear");
+    debug_println!("waiting for SRC_SCR reset to clear");
 
-    // wait for self-clearing SW reset to clear
+    // wait for reset to clear
     unsafe { while (ptr::read_volatile(src_scr_ptr) & (1 << 3)) != 0 {} };
 }
