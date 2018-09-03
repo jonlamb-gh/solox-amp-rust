@@ -22,7 +22,7 @@ A bare metal Rust cortex-m project runs on the M4 core.
 
 ## Building
 
-** REQUIRES a cargo-fel4 that doesn't overwrite the src/bin/root-task.rs file **
+**NOTE**: requires a cargo-fel4 that does not overwrite the `src/bin/root-task.rs` file
 
 Here's a [branch](https://github.com/jonlamb-gh/cargo-fel4/tree/keep-root-rask-for-development) I use.
 
