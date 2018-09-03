@@ -24,7 +24,7 @@ A bare metal Rust cortex-m project runs on the M4 core.
 
 ** REQUIRES a cargo-fel4 that doesn't overwrite the src/bin/root-task.rs file **
 
-Here's a [branch](https://github.com/maindotrs/cargo-fel4/tree/keep-root-rask-for-development) I use.
+Here's a [branch](https://github.com/jonlamb-gh/cargo-fel4/tree/keep-root-rask-for-development) I use.
 
 Note that the L2 cache memory is currently defined as OCRAM for the M4 core.
 
