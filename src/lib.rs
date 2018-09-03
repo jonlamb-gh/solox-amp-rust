@@ -39,8 +39,8 @@ extern "C" {
 
 const FAULT_EP_BADGE: seL4_Word = 0xBEEF;
 
-// thread stack size in bytes or u64's?
-const THREAD_STACK_SIZE: usize = 4096;
+// 4096 bytes
+const THREAD_STACK_SIZE: usize = 512;
 static mut THREAD_STACK: *const [u64; THREAD_STACK_SIZE] = &[0; THREAD_STACK_SIZE];
 
 pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
@@ -147,7 +147,7 @@ pub fn init(allocator: &mut Allocator, global_fault_ep_cap: seL4_CPtr) {
 }
 
 pub fn handle_fault(badge: seL4_Word) {
-    debug_println!("!!! Fault from badge 0x{:X}", badge);
+    debug_println!("\n!!! Fault from badge 0x{:X}\n", badge);
 }
 
 #[derive(Debug)]
@@ -197,8 +197,12 @@ pub fn thread_run(thread_data: &ThreadData) {
         mut_u32_ptr(thread_data.tcm_vaddr),
     );
 
-    debug_println!("\nthread work all done, sitting on loop");
+    debug_println!("\nthread work all done, going to fault now");
 
+    // this should fault, root-task will call our handler
+    unsafe { ptr::write_volatile(0 as _, 0) };
+
+    // shouldn't get here
     loop {}
 }
 
@@ -224,9 +228,9 @@ fn upload_and_run_m4_binary(
         );
     }
 
-    debug_println!("enabling and starting the M4 core");
+    debug_println!("starting the M4 core");
 
-    // enable M4 and assert soft reset
+    // enable M4 and assert reset
     unsafe {
         ptr::write_volatile(
             src_scr_ptr,
@@ -237,8 +241,8 @@ fn upload_and_run_m4_binary(
     // release the reset, starting the M4
     unsafe { ptr::write_volatile(src_scr_ptr, ptr::read_volatile(src_scr_ptr) & !(1 << 4)) };
 
-    debug_println!("waiting for SRC_SCR reset auto-clear (bit 3) to clear");
+    debug_println!("waiting for SRC_SCR reset to clear");
 
-    // wait for self-clearing SW reset to clear
+    // wait for reset to clear
     unsafe { while (ptr::read_volatile(src_scr_ptr) & (1 << 3)) != 0 {} };
 }
