@@ -5,6 +5,7 @@
 #![no_main]
 #![feature(core_intrinsics)]
 
+extern crate bare_metal;
 extern crate cortex_m;
 extern crate cortex_m_rt as rt;
 
@@ -16,6 +17,23 @@ use rt::{entry, exception, ExceptionFrame};
 // see src/bsp.rs
 mod bsp;
 use bsp::*;
+
+/// Interrupts for the M4 core
+#[allow(non_camel_case_types)]
+pub enum Interrupt {
+    PMU_REG,  // 54
+    PMU_CORE, // 127
+}
+
+unsafe impl ::bare_metal::Nr for Interrupt {
+    #[inline]
+    fn nr(&self) -> u8 {
+        match *self {
+            Interrupt::PMU_REG => 54,
+            Interrupt::PMU_CORE => 127,
+        }
+    }
+}
 
 macro_rules! serial_print {
     ($($arg:tt)*) => ({
@@ -33,6 +51,7 @@ macro_rules! serial_println {
 fn main() -> ! {
     let p = cortex_m::Peripherals::take().unwrap();
     let mut syst = p.SYST;
+    let mut nvic = p.NVIC;
 
     // configure the system tick timer to wrap every 1 millisecond
     // M4 is set to 227 MHz by default
@@ -48,9 +67,13 @@ fn main() -> ! {
 
     // example of macro use vs putstr()
     //serial_println!("M4 core is up and running\n");
-    putstr("M4 core is up and running\n\n");
+    putstr("\nM4 core is up and running\n\n");
 
     delay_ms(&mut syst, 1000);
+
+    // enable PMU interrupts
+    nvic.enable(Interrupt::PMU_REG);
+    nvic.enable(Interrupt::PMU_CORE);
 
     let string_data: &'static str = "Hello world from Rust on Cortex-M4\n";
 
@@ -60,14 +83,8 @@ fn main() -> ! {
             putchar(c);
             delay_ms(&mut syst, 100);
         }
-    }
-}
 
-fn delay_ms(syst: &mut cortex_m::peripheral::SYST, ms: u32) {
-    syst.clear_current();
-
-    for _ in 0..ms {
-        while !syst.has_wrapped() {}
+        nvic.set_pending(Interrupt::PMU_REG);
     }
 }
 

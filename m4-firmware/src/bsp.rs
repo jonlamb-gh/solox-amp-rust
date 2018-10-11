@@ -196,3 +196,11 @@ pub fn putstr(string: &'static str) {
         putchar(c);
     }
 }
+
+pub fn delay_ms(syst: &mut cortex_m::peripheral::SYST, ms: u32) {
+    syst.clear_current();
+
+    for _ in 0..ms {
+        while !syst.has_wrapped() {}
+    }
+}

@@ -6,6 +6,7 @@ publish = false
 [dependencies]
 cortex-m = "0.5.7"
 cortex-m-rt = "0.6.3"
+bare-metal = "0.2.3"
 
 [profile.release]
 codegen-units = 1 # better optimizations

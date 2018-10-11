@@ -42,6 +42,7 @@ dependencies = [
 name = "m4-firmware"
 version = "0.1.0"
 dependencies = [
+ "bare-metal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
