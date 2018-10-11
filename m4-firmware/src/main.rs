@@ -1,3 +1,6 @@
+//! TODO
+//! - handle PMU interrupt and others
+
 #![no_std]
 #![no_main]
 
@@ -14,9 +17,7 @@ use rt::ExceptionFrame;
 mod bsp;
 use bsp::*;
 
-entry!(main);
-
-#[inline(never)]
+#[entry]
 fn main() -> ! {
     let p = cortex_m::Peripherals::take().unwrap();
     let mut syst = p.SYST;
@@ -55,14 +56,12 @@ fn delay_ms(syst: &mut cortex_m::peripheral::SYST, ms: u32) {
     }
 }
 
-exception!(HardFault, hard_fault);
-
-fn hard_fault(ef: &ExceptionFrame) -> ! {
+#[exception]
+fn HardFault(ef: &ExceptionFrame) -> ! {
     panic!("HardFault at {:#?}", ef);
 }
 
-exception!(*, default_handler);
-
-fn default_handler(irqn: i16) {
+#[exception]
+fn DefaultHandler(irqn: i16) {
     panic!("Unhandled exception (IRQn = {})", irqn);
 }

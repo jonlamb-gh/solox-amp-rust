@@ -1,7 +1,7 @@
 [package]
 name = "solox"
-version = "0.0.1"
-authors = ["jonlamb-gh <lamb.jon.io@gmail.com>"]
+version = "0.1.0"
+authors = ["Jon Lamb"]
 
 [dependencies]
 libsel4-sys = {git = "https://github.com/jonlamb-gh/libsel4-sys.git", branch = "devel"}
