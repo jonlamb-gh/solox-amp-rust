@@ -9,8 +9,10 @@ extern crate bare_metal;
 extern crate cortex_m;
 extern crate cortex_m_rt as rt;
 
+use core::cell::Cell;
 use core::intrinsics;
 use core::panic::PanicInfo;
+use cortex_m::interrupt::Mutex;
 use cortex_m::peripheral::syst::SystClkSource;
 use rt::{entry, exception, ExceptionFrame};
 
@@ -25,7 +27,7 @@ pub enum Interrupt {
     PMU_CORE, // 127
 }
 
-unsafe impl ::bare_metal::Nr for Interrupt {
+unsafe impl bare_metal::Nr for Interrupt {
     #[inline]
     fn nr(&self) -> u8 {
         match *self {
@@ -46,6 +48,9 @@ macro_rules! serial_println {
     ($fmt:expr) => (serial_print!(concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => (serial_print!(concat!($fmt, "\n"), $($arg)*));
 }
+
+/// TODO
+static TEST_RESULTS_WORD: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 
 #[entry]
 fn main() -> ! {
@@ -88,14 +93,37 @@ fn main() -> ! {
     }
 }
 
+fn handle_pmu_failure_irq() {
+    serial_println!("** serviced PMU IRQ **");
+}
+
 #[exception]
 fn HardFault(ef: &ExceptionFrame) -> ! {
     panic!("HardFault at {:#?}", ef);
 }
 
+/// We don't have a device crate yet, so we broker the
+/// IRQ from the default handler.
 #[exception]
 fn DefaultHandler(irqn: i16) {
-    panic!("Unhandled exception (IRQn = {})", irqn);
+    use bare_metal::Nr;
+
+    // irqn will be positive when the handler is servicing
+    // a device specific exception (interrupt)
+    let irq_was_serviced = if irqn > 0 {
+        if irqn == Interrupt::PMU_REG.nr() as i16 || irqn == Interrupt::PMU_CORE.nr() as i16 {
+            handle_pmu_failure_irq();
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if !irq_was_serviced {
+        panic!("Unhandled exception (IRQn = {})", irqn);
+    }
 }
 
 #[panic_handler]
