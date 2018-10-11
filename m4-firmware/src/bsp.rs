@@ -191,11 +191,13 @@ pub fn putchar(data: char) {
     }
 }
 
+/*
 pub fn putstr(string: &'static str) {
     for c in string.chars() {
         putchar(c);
     }
 }
+*/
 
 pub fn delay_ms(syst: &mut cortex_m::peripheral::SYST, ms: u32) {
     syst.clear_current();

@@ -50,13 +50,22 @@ macro_rules! serial_println {
 }
 
 /// TODO
+const TEST_RESULTS_FAIL: u32 = 0xDEADDEAD;
+const TEST_RESULTS_PASS: u32 = 0xBEEFBEEF;
 static TEST_RESULTS_WORD: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
+
+fn get_test_results() -> u32 {
+    cortex_m::interrupt::free(|cs| {
+        TEST_RESULTS_WORD.borrow(cs).get()
+    })
+}
 
 #[entry]
 fn main() -> ! {
     let p = cortex_m::Peripherals::take().unwrap();
     let mut syst = p.SYST;
     let mut nvic = p.NVIC;
+    let mut scb = p.SCB;
 
     // configure the system tick timer to wrap every 1 millisecond
     // M4 is set to 227 MHz by default
@@ -70,9 +79,7 @@ fn main() -> ! {
 
     init_uart();
 
-    // example of macro use vs putstr()
-    //serial_println!("M4 core is up and running\n");
-    putstr("\nM4 core is up and running\n\n");
+    serial_println!("\nM4 core is up and running\n");
 
     delay_ms(&mut syst, 1000);
 
@@ -80,21 +87,67 @@ fn main() -> ! {
     nvic.enable(Interrupt::PMU_REG);
     nvic.enable(Interrupt::PMU_CORE);
 
-    let string_data: &'static str = "Hello world from Rust on Cortex-M4\n";
+    // start the test
+    serial_println!("starting the test");
 
-    // loop forever, sending characters
-    loop {
-        for c in string_data.chars() {
-            putchar(c);
-            delay_ms(&mut syst, 100);
-        }
+    // TODO - use IRQ priority and a timer to stop test?
+    syst.disable_counter();
+    syst.clear_current();
+    //syst.set_reload(227000000 / 10000); // 10 ms
+    syst.set_reload(227000000 / 1000); // 1 ms
+    syst.enable_interrupt();
+    syst.enable_counter();
 
-        nvic.set_pending(Interrupt::PMU_REG);
+    // raise PMU regulator failure interrupt
+    nvic.set_pending(Interrupt::PMU_REG);
+
+    while syst.has_wrapped() == false {}
+    syst.disable_counter();
+    syst.disable_interrupt();
+    // end of test
+
+    let results = get_test_results();
+
+    serial_print!("test results: ");
+    if results == TEST_RESULTS_PASS {
+        serial_println!("PASS");
+    } else if results == TEST_RESULTS_FAIL {
+        serial_println!("FAIL");
+    } else {
+        serial_println!("UNKNOWN FAILURE");
     }
+
+    // loop forever, wait for interrupts
+    scb.set_sleepdeep();
+    loop {
+        cortex_m::asm::wfi()
+    }
+
+    // should not get here
 }
 
 fn handle_pmu_failure_irq() {
-    serial_println!("** serviced PMU IRQ **");
+    // TODO - clean shutdown
+
+    cortex_m::interrupt::free(|cs| {
+        let results = TEST_RESULTS_WORD.borrow(cs).get();
+
+        if results != TEST_RESULTS_FAIL {
+            TEST_RESULTS_WORD.borrow(cs).set(TEST_RESULTS_PASS);
+        }
+
+    });
+}
+
+#[exception]
+fn SysTick() {
+    cortex_m::interrupt::free(|cs| {
+        let results = TEST_RESULTS_WORD.borrow(cs).get();
+
+        if results != TEST_RESULTS_PASS {
+            TEST_RESULTS_WORD.borrow(cs).set(TEST_RESULTS_FAIL);
+        }
+    });
 }
 
 #[exception]
