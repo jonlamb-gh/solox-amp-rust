@@ -180,7 +180,7 @@ pub fn putchar(data: char) {
         // wait for Tx FIFO to be ready
         while (ptr::read_volatile(UART2_UTS) & UART_UTS_TXFULL) != 0 {}
 
-        // replace line feed with caraige return
+        // add caraige return
         if data == '\n' {
             ptr::write_volatile(UART2_UTXD, '\r' as u32);
 
