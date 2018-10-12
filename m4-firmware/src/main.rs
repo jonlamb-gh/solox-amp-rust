@@ -7,6 +7,7 @@
 
 extern crate cortex_m;
 extern crate cortex_m_rt as rt;
+extern crate rpmsg_lite;
 
 use core::intrinsics;
 use core::panic::PanicInfo;

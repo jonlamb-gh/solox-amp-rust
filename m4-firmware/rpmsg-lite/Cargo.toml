@@ -1,0 +1,11 @@
+[package]
+name = "rpmsg-lite"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+
+[dependencies]
+cortex-m = "0.5.7"
+bare-metal = "0.2.3"
+
+#[features]
+#default = ["cortex-m-remote", "cortex-a-master"]

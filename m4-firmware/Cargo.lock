@@ -44,6 +44,7 @@ version = "0.1.0"
 dependencies = [
  "cortex-m 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-rt 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rpmsg-lite 0.1.0",
 ]
 
 [[package]]
@@ -87,6 +88,13 @@ dependencies = [
 name = "rand_core"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "rpmsg-lite"
+version = "0.1.0"
+dependencies = [
+ "cortex-m 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "syn"
