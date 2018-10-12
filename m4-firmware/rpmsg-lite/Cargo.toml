@@ -6,6 +6,7 @@ authors = ["Jon Lamb"]
 [dependencies]
 cortex-m = "0.5.7"
 bare-metal = "0.2.3"
+vcell = "0.1.0"
 
 #[features]
 #default = ["cortex-m-remote", "cortex-a-master"]
