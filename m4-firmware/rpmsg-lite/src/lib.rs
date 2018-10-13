@@ -4,9 +4,9 @@
 // RDC BOARD_MU_RDC_PDAP/rdcPdapMuB
 
 extern crate bare_metal;
-extern crate vcell;
 extern crate cortex_m;
+extern crate vcell;
 
-pub mod mu;
 pub mod env;
+pub mod mu;
 pub mod platform;

@@ -1,8 +1,8 @@
 // https://github.com/NXPmicro/rpmsg-lite/blob/master/lib/rpmsg_lite/porting/platform/imx6sx_m4/rpmsg_platform.c
 
-use cortex_m::{peripheral, interrupt};
-use cortex_m::peripheral::scb::VectActive;
 use bare_metal::Nr;
+use cortex_m::peripheral::scb::VectActive;
+use cortex_m::{interrupt, peripheral};
 
 use mu;
 
@@ -14,9 +14,7 @@ pub struct Platform {
 
 impl Default for Platform {
     fn default() -> Self {
-        Self {
-            disable_counter: 0,
-        }
+        Self { disable_counter: 0 }
     }
 }
 
@@ -39,6 +37,7 @@ unsafe impl Nr for Interrupt {
     }
 }
 
+// TODO - figure out some traits after initial port
 impl Platform {
     pub fn init(&mut self) {
         // prepare for the MU interrupt
@@ -53,6 +52,8 @@ impl Platform {
         let nr = Interrupt::MU_M4.nr();
         unsafe { nvic.iser[usize::from(nr / 32)].write(1 << (nr % 32)) };
     }
+
+    //pub fn time_delay()
 
     /// Return whether CPU is processing IRQ
     pub fn in_isr() -> bool {
