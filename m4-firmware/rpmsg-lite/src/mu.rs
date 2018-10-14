@@ -2,10 +2,13 @@
 
 #![allow(non_camel_case_types, non_upper_case_globals)]
 
+// reference impl:
+// https://github.com/EmbeddedRPC/erpc-imx-demos/blob/master/middleware/imx-hal/platform/drivers/inc/mu_imx.h
 // TODO
 // - macro for generating A and B peripherals
 // - use an svd file
 // - inlining functions that are just register manipulations
+// - get power mode
 
 use core::marker::PhantomData;
 use void::Void;
@@ -113,6 +116,12 @@ impl MU_B {
         }
     }
 
+    /// Get the value of the 3-bit flags set by the other core
+    pub fn flags(&self) -> u32 {
+        let rb = unsafe { &*Self::ptr() };
+        rb.sr.register.get() & MU_SR_Fn_MASK
+    }
+
     /// Enable TX empty interrupt
     pub fn enable_tx_empty_int(&self, msg_register: MsgRegister) {
         let rb = unsafe { &*Self::ptr() };
@@ -135,6 +144,77 @@ impl MU_B {
             & !(MU_CR_GIRn_MASK | (MU_CR_TIE0_MASK >> u32::from(msg_register))),
         );
     }
+
+    /// Enable RX full interrupt
+    pub fn enable_rx_full_int(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let cr = rb.cr.register.get();
+        rb.cr.register.set(
+            // clear GIRn
+            (cr & !MU_CR_GIRn_MASK)
+            // set RIEn
+            | (MU_CR_RIE0_MASK >> u32::from(msg_register)),
+        );
+    }
+
+    /// Disable RX full interrupt
+    pub fn disable_rx_full_int(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let cr = rb.cr.register.get();
+        rb.cr.register.set(
+            cr
+            // clear GIRn, RIEn
+            & !(MU_CR_GIRn_MASK | (MU_CR_RIE0_MASK >> u32::from(msg_register))),
+        );
+    }
+
+    /// Enable general purpose interrupt
+    pub fn enable_general_int(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let cr = rb.cr.register.get();
+        rb.cr.register.set(
+            // clear GIRn
+            (cr & !MU_CR_GIRn_MASK)
+            // set GIEn
+            | (MU_CR_GIE0_MASK >> u32::from(msg_register)),
+        );
+    }
+
+    /// Disable general purpose interrupt
+    pub fn disable_general_int(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let cr = rb.cr.register.get();
+        rb.cr.register.set(
+            cr
+            // clear GIRn, GIEn
+            & !(MU_CR_GIRn_MASK | (MU_CR_GIE0_MASK >> u32::from(msg_register))),
+        );
+    }
+
+    /// Check specific general purpose interrupt pending flag
+    pub fn is_general_int_pending(&self, msg_register: MsgRegister) -> bool {
+        let rb = unsafe { &*Self::ptr() };
+        rb.sr.register.get() & (MU_SR_GIP0_MASK >> u32::from(msg_register)) != 0
+    }
+
+    /// Clear specific general purpose interrupt pending flag
+    pub fn clear_general_int_pending(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let sr = rb.sr.register.get();
+        rb.sr
+            .register
+            .set(sr | (MU_SR_GIP0_MASK >> u32::from(msg_register)));
+    }
+
+    /// Get the event pending status
+    ///
+    /// To ensure events have been posted to the
+    /// other side before entering STOP mode,
+    /// verify the event pending status using this function.
+    pub fn is_event_pending(&self) -> bool {
+        let rb = unsafe { &*Self::ptr() };
+        rb.sr.register.get() & MU_SR_EP_MASK != 0
+    }
 }
 
 impl From<MsgRegister> for u32 {
@@ -151,17 +231,22 @@ impl From<MsgRegister> for u32 {
 pub const NUM_RX_REGISTERS: u32 = 4;
 pub const NUM_TX_REGISTERS: u32 = 4;
 
-pub const MU_SR_RF0_MASK: u32 = 1 << 27;
 pub const MU_SR_TE0_MASK: u32 = 1 << 23;
-pub const MU_SR_FUP_MASK: u32 = 0x0000_0100;
+pub const MU_SR_RF0_MASK: u32 = 1 << 27;
+pub const MU_SR_GIP0_MASK: u32 = 1 << 31;
+pub const MU_SR_FUP_MASK: u32 = 0x100;
+pub const MU_SR_Fn_MASK: u32 = 0x7;
+pub const MU_SR_EP_MASK: u32 = 0x10;
 
 pub const MU_CR_GIR0_MASK: u32 = 1 << 19;
 pub const MU_CR_TIE0_MASK: u32 = 1 << 23;
+pub const MU_CR_RIE0_MASK: u32 = 1 << 27;
+pub const MU_CR_GIE0_MASK: u32 = 1 << 31;
 pub const MU_CR_GIEn_MASK: u32 = 0xF000_0000;
 pub const MU_CR_RIEn_MASK: u32 = 0x0F00_0000;
 pub const MU_CR_TIEn_MASK: u32 = 0x00F0_0000;
 pub const MU_CR_GIRn_MASK: u32 = 0x000F_0000;
-pub const MU_CR_Fn_MASK: u32 = 0x000_0007;
+pub const MU_CR_Fn_MASK: u32 = 0x7;
 
 #[repr(C)]
 struct RegisterBlock {
