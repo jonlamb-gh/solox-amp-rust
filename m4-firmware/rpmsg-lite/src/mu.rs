@@ -5,10 +5,10 @@
 // TODO
 // - macro for generating A and B peripherals
 // - use an svd file
-// - inlining
-// - use HAL spirit of Errors (nb::WouldBlock/IsPending/etc)?
+// - inlining functions that are just register manipulations
 
 use core::marker::PhantomData;
+use void::Void;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum MsgRegister {
@@ -40,29 +40,32 @@ impl MU_B {
         );
     }
 
+    pub fn send_msg(&self, msg_register: MsgRegister, msg: u32) -> nb::Result<(), Void> {
+        if self.is_tx_empty(msg_register) {
+            let rb = unsafe { &*Self::ptr() };
+            Ok(rb.tr(msg_register, msg))
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
+    }
+
+    pub fn recv_msg(&self, msg_register: MsgRegister) -> nb::Result<u32, Void> {
+        if self.is_rx_full(msg_register) {
+            let rb = unsafe { &*Self::ptr() };
+            Ok(rb.rr(msg_register))
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
+    }
+
     pub fn is_rx_full(&self, msg_register: MsgRegister) -> bool {
         let rb = unsafe { &*Self::ptr() };
         rb.sr.register.get() & (MU_SR_RF0_MASK >> u32::from(msg_register)) != 0
     }
 
-    // use nb::Error::WouldBlock?
-    pub fn try_recv_msg(&self, msg_register: MsgRegister) -> Result<u32, ()> {
-        if self.is_rx_full(msg_register) {
-            let rb = unsafe { &*Self::ptr() };
-            Ok(rb.rr(msg_register))
-        } else {
-            Err(())
-        }
-    }
-
-    pub fn recv_msg(&self, msg_register: MsgRegister) -> u32 {
+    pub fn is_tx_empty(&self, msg_register: MsgRegister) -> bool {
         let rb = unsafe { &*Self::ptr() };
-        let mask = MU_SR_RF0_MASK >> u32::from(msg_register);
-
-        // wait for rx to be full
-        while (rb.sr.register.get() & mask) == 0 {}
-
-        rb.rr(msg_register)
+        rb.sr.register.get() & (MU_SR_TE0_MASK >> u32::from(msg_register)) != 0
     }
 
     pub fn is_general_int_accepted(&self, msg_register: MsgRegister) -> bool {
@@ -71,9 +74,10 @@ impl MU_B {
     }
 
     /// Trigger a general purpose interrupt to the other core
-    /// Returns true if the interrupt was triggered
-    /// and false if the interrupt is currently pending
-    pub fn trigger_general_int(&self, msg_register: MsgRegister) -> bool {
+    ///
+    /// Returns Ok if the interrupt was triggered
+    /// and nb::Error::WouldBlock if the interrupt is currently pending
+    pub fn trigger_general_int(&self, msg_register: MsgRegister) -> nb::Result<(), Void> {
         if self.is_general_int_accepted(msg_register) {
             // all interrupts have been accepted, trigger now
             let rb = unsafe { &*Self::ptr() };
@@ -82,12 +86,54 @@ impl MU_B {
                 // clear GIRn
                 (cr & !MU_CR_GIRn_MASK)
                 // set GIRn
-                | (MU_CR_GIR0_MASK >> u32::from(msg_register))
+                | (MU_CR_GIR0_MASK >> u32::from(msg_register)),
             );
-            true
+            Ok(())
         } else {
-            false
+            Err(nb::Error::WouldBlock)
         }
+    }
+
+    pub fn is_flag_pending(&self) -> bool {
+        let rb = unsafe { &*Self::ptr() };
+        rb.sr.register.get() & MU_SR_FUP_MASK != 0
+    }
+
+    /// Try to set some of the 3-bit flags
+    pub fn set_flags(&self, flags: u32) -> nb::Result<(), Void> {
+        if self.is_flag_pending() {
+            let rb = unsafe { &*Self::ptr() };
+            let cr = rb.cr.register.get();
+            rb.cr
+                .register
+                .set((cr & !(MU_CR_GIRn_MASK | MU_CR_Fn_MASK)) | flags);
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
+    }
+
+    /// Enable TX empty interrupt
+    pub fn enable_tx_empty_int(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let cr = rb.cr.register.get();
+        rb.cr.register.set(
+            // clear GIRn
+            (cr & !MU_CR_GIRn_MASK)
+            // set TIEn
+            | (MU_CR_TIE0_MASK >> u32::from(msg_register)),
+        );
+    }
+
+    /// Disable TX empty interrupt
+    pub fn disable_tx_empty_int(&self, msg_register: MsgRegister) {
+        let rb = unsafe { &*Self::ptr() };
+        let cr = rb.cr.register.get();
+        rb.cr.register.set(
+            cr
+            // clear GIRn, TIEn
+            & !(MU_CR_GIRn_MASK | (MU_CR_TIE0_MASK >> u32::from(msg_register))),
+        );
     }
 }
 
@@ -106,8 +152,11 @@ pub const NUM_RX_REGISTERS: u32 = 4;
 pub const NUM_TX_REGISTERS: u32 = 4;
 
 pub const MU_SR_RF0_MASK: u32 = 1 << 27;
-pub const MU_CR_GIR0_MASK: u32 = 1 << 19;
+pub const MU_SR_TE0_MASK: u32 = 1 << 23;
+pub const MU_SR_FUP_MASK: u32 = 0x0000_0100;
 
+pub const MU_CR_GIR0_MASK: u32 = 1 << 19;
+pub const MU_CR_TIE0_MASK: u32 = 1 << 23;
 pub const MU_CR_GIEn_MASK: u32 = 0xF000_0000;
 pub const MU_CR_RIEn_MASK: u32 = 0x0F00_0000;
 pub const MU_CR_TIEn_MASK: u32 = 0x00F0_0000;
@@ -135,6 +184,15 @@ impl RegisterBlock {
             MsgRegister::R1 => self.rr1.register.get(),
             MsgRegister::R2 => self.rr2.register.get(),
             MsgRegister::R3 => self.rr3.register.get(),
+        }
+    }
+
+    fn tr(&self, msg_register: MsgRegister, msg: u32) {
+        match msg_register {
+            MsgRegister::R0 => self.tr0.register.set(msg),
+            MsgRegister::R1 => self.tr1.register.set(msg),
+            MsgRegister::R2 => self.tr2.register.set(msg),
+            MsgRegister::R3 => self.tr3.register.set(msg),
         }
     }
 }

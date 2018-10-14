@@ -5,7 +5,9 @@
 
 extern crate bare_metal;
 extern crate cortex_m;
+extern crate nb;
 extern crate vcell;
+extern crate void;
 
 pub mod env;
 pub mod mu;
