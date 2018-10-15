@@ -241,6 +241,12 @@ pub struct MU_B {
 unsafe impl Send for MU_B {}
 
 impl MU_B {
+    pub fn new() -> Self {
+        MU_B {
+            _marker: PhantomData,
+        }
+    }
+
     fn ptr() -> *const RegisterBlock {
         0x4229_C000 as *const _
     }
