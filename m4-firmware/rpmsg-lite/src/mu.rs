@@ -11,6 +11,7 @@
 // - get power mode
 
 use core::marker::PhantomData;
+use core::ops::Deref;
 use void::Void;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -21,20 +22,21 @@ pub enum MsgRegister {
     R3,
 }
 
-pub struct MU_B {
-    _marker: PhantomData<*const ()>,
+// MU_A or MU_B
+pub struct Mu<MU> {
+    /// Register block
+    rb: MU,
 }
 
-impl MU_B {
-    fn ptr() -> *const RegisterBlock {
-        0x4229_C000 as *const _
+impl Mu<MU_B> {
+    pub fn new(mu: MU_B) -> Self {
+        Mu { rb: mu }
     }
 
-    pub fn init() {
-        let rb = unsafe { &*Self::ptr() };
+    pub fn init(&mut self) {
         // Clear GIEn, RIEn, TIEn, GIRn and ABFn
-        let bits = rb.cr.register.get();
-        rb.cr.register.set(
+        let bits = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             bits & !(MU_CR_GIEn_MASK
                 | MU_CR_RIEn_MASK
                 | MU_CR_TIEn_MASK
@@ -45,8 +47,7 @@ impl MU_B {
 
     pub fn send_msg(&self, msg_register: MsgRegister, msg: u32) -> nb::Result<(), Void> {
         if self.is_tx_empty(msg_register) {
-            let rb = unsafe { &*Self::ptr() };
-            Ok(rb.tr(msg_register, msg))
+            Ok(self.rb.tr(msg_register, msg))
         } else {
             Err(nb::Error::WouldBlock)
         }
@@ -54,26 +55,22 @@ impl MU_B {
 
     pub fn recv_msg(&self, msg_register: MsgRegister) -> nb::Result<u32, Void> {
         if self.is_rx_full(msg_register) {
-            let rb = unsafe { &*Self::ptr() };
-            Ok(rb.rr(msg_register))
+            Ok(self.rb.rr(msg_register))
         } else {
             Err(nb::Error::WouldBlock)
         }
     }
 
     pub fn is_rx_full(&self, msg_register: MsgRegister) -> bool {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & (MU_SR_RF0_MASK >> u32::from(msg_register)) != 0
+        self.rb.sr.register.get() & (MU_SR_RF0_MASK >> u32::from(msg_register)) != 0
     }
 
     pub fn is_tx_empty(&self, msg_register: MsgRegister) -> bool {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & (MU_SR_TE0_MASK >> u32::from(msg_register)) != 0
+        self.rb.sr.register.get() & (MU_SR_TE0_MASK >> u32::from(msg_register)) != 0
     }
 
     pub fn is_general_int_accepted(&self, msg_register: MsgRegister) -> bool {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & (MU_CR_GIR0_MASK >> u32::from(msg_register)) == 0
+        self.rb.sr.register.get() & (MU_CR_GIR0_MASK >> u32::from(msg_register)) == 0
     }
 
     /// Trigger a general purpose interrupt to the other core
@@ -83,9 +80,8 @@ impl MU_B {
     pub fn trigger_general_int(&self, msg_register: MsgRegister) -> nb::Result<(), Void> {
         if self.is_general_int_accepted(msg_register) {
             // all interrupts have been accepted, trigger now
-            let rb = unsafe { &*Self::ptr() };
-            let cr = rb.cr.register.get();
-            rb.cr.register.set(
+            let cr = self.rb.cr.register.get();
+            self.rb.cr.register.set(
                 // clear GIRn
                 (cr & !MU_CR_GIRn_MASK)
                 // set GIRn
@@ -98,16 +94,15 @@ impl MU_B {
     }
 
     pub fn is_flag_pending(&self) -> bool {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & MU_SR_FUP_MASK != 0
+        self.rb.sr.register.get() & MU_SR_FUP_MASK != 0
     }
 
     /// Try to set some of the 3-bit flags
     pub fn set_flags(&self, flags: u32) -> nb::Result<(), Void> {
         if self.is_flag_pending() {
-            let rb = unsafe { &*Self::ptr() };
-            let cr = rb.cr.register.get();
-            rb.cr
+            let cr = self.rb.cr.register.get();
+            self.rb
+                .cr
                 .register
                 .set((cr & !(MU_CR_GIRn_MASK | MU_CR_Fn_MASK)) | flags);
             Ok(())
@@ -118,15 +113,13 @@ impl MU_B {
 
     /// Get the value of the 3-bit flags set by the other core
     pub fn flags(&self) -> u32 {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & MU_SR_Fn_MASK
+        self.rb.sr.register.get() & MU_SR_Fn_MASK
     }
 
     /// Enable TX empty interrupt
     pub fn enable_tx_empty_int(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let cr = rb.cr.register.get();
-        rb.cr.register.set(
+        let cr = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             // clear GIRn
             (cr & !MU_CR_GIRn_MASK)
             // set TIEn
@@ -136,9 +129,8 @@ impl MU_B {
 
     /// Disable TX empty interrupt
     pub fn disable_tx_empty_int(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let cr = rb.cr.register.get();
-        rb.cr.register.set(
+        let cr = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             cr
             // clear GIRn, TIEn
             & !(MU_CR_GIRn_MASK | (MU_CR_TIE0_MASK >> u32::from(msg_register))),
@@ -147,9 +139,8 @@ impl MU_B {
 
     /// Enable RX full interrupt
     pub fn enable_rx_full_int(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let cr = rb.cr.register.get();
-        rb.cr.register.set(
+        let cr = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             // clear GIRn
             (cr & !MU_CR_GIRn_MASK)
             // set RIEn
@@ -159,9 +150,8 @@ impl MU_B {
 
     /// Disable RX full interrupt
     pub fn disable_rx_full_int(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let cr = rb.cr.register.get();
-        rb.cr.register.set(
+        let cr = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             cr
             // clear GIRn, RIEn
             & !(MU_CR_GIRn_MASK | (MU_CR_RIE0_MASK >> u32::from(msg_register))),
@@ -170,9 +160,8 @@ impl MU_B {
 
     /// Enable general purpose interrupt
     pub fn enable_general_int(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let cr = rb.cr.register.get();
-        rb.cr.register.set(
+        let cr = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             // clear GIRn
             (cr & !MU_CR_GIRn_MASK)
             // set GIEn
@@ -182,9 +171,8 @@ impl MU_B {
 
     /// Disable general purpose interrupt
     pub fn disable_general_int(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let cr = rb.cr.register.get();
-        rb.cr.register.set(
+        let cr = self.rb.cr.register.get();
+        self.rb.cr.register.set(
             cr
             // clear GIRn, GIEn
             & !(MU_CR_GIRn_MASK | (MU_CR_GIE0_MASK >> u32::from(msg_register))),
@@ -193,15 +181,14 @@ impl MU_B {
 
     /// Check specific general purpose interrupt pending flag
     pub fn is_general_int_pending(&self, msg_register: MsgRegister) -> bool {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & (MU_SR_GIP0_MASK >> u32::from(msg_register)) != 0
+        self.rb.sr.register.get() & (MU_SR_GIP0_MASK >> u32::from(msg_register)) != 0
     }
 
     /// Clear specific general purpose interrupt pending flag
     pub fn clear_general_int_pending(&self, msg_register: MsgRegister) {
-        let rb = unsafe { &*Self::ptr() };
-        let sr = rb.sr.register.get();
-        rb.sr
+        let sr = self.rb.sr.register.get();
+        self.rb
+            .sr
             .register
             .set(sr | (MU_SR_GIP0_MASK >> u32::from(msg_register)));
     }
@@ -212,8 +199,7 @@ impl MU_B {
     /// other side before entering STOP mode,
     /// verify the event pending status using this function.
     pub fn is_event_pending(&self) -> bool {
-        let rb = unsafe { &*Self::ptr() };
-        rb.sr.register.get() & MU_SR_EP_MASK != 0
+        self.rb.sr.register.get() & MU_SR_EP_MASK != 0
     }
 }
 
@@ -248,8 +234,27 @@ pub const MU_CR_TIEn_MASK: u32 = 0x00F0_0000;
 pub const MU_CR_GIRn_MASK: u32 = 0x000F_0000;
 pub const MU_CR_Fn_MASK: u32 = 0x7;
 
+pub struct MU_B {
+    _marker: PhantomData<*const ()>,
+}
+
+unsafe impl Send for MU_B {}
+
+impl MU_B {
+    fn ptr() -> *const RegisterBlock {
+        0x4229_C000 as *const _
+    }
+}
+
+impl Deref for MU_B {
+    type Target = RegisterBlock;
+    fn deref(&self) -> &RegisterBlock {
+        unsafe { &*Self::ptr() }
+    }
+}
+
 #[repr(C)]
-struct RegisterBlock {
+pub struct RegisterBlock {
     pub tr0: TR,
     pub tr1: TR,
     pub tr2: TR,

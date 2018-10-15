@@ -6,17 +6,22 @@ use cortex_m::{interrupt, peripheral};
 
 use mu;
 
-#[derive(Copy, Clone, Debug)]
-pub struct Platform {
+//#[derive(Copy, Clone, Debug)]
+pub struct Platform<'a> {
     // not sure this counter mechanism is really needed?
-    disable_counter: u32,
+    //disable_counter: u32,
+    nvic: &'a mut peripheral::NVIC,
 }
 
+/*
 impl Default for Platform {
     fn default() -> Self {
-        Self { disable_counter: 0 }
+        Self {
+            //disable_counter: 0
+        }
     }
 }
+*/
 
 /// Interrupts from the M4's (core B) perspective
 #[allow(non_camel_case_types)]
@@ -38,19 +43,20 @@ unsafe impl Nr for Interrupt {
 }
 
 // TODO - figure out some traits after initial port
-impl Platform {
+impl<'a> Platform<'a> {
+    pub fn new(nvic: &'a mut peripheral::NVIC) -> Self {
+        Platform { nvic }
+    }
+
     pub fn init(&mut self) {
         // prepare for the MU interrupt
         // MU must be initialized before rpmsg init is called
-        mu::MU_B::init();
+        //mu::MU_B::init();
 
         //#define APP_MU_IRQ_PRIORITY (3)
         // NVIC_SetPriority(BOARD_MU_IRQ_NUM, APP_MU_IRQ_PRIORITY);
 
-        //nvic.enable(Interrupt::MU_M4);
-        let nvic = unsafe { &*peripheral::NVIC::ptr() };
-        let nr = Interrupt::MU_M4.nr();
-        unsafe { nvic.iser[usize::from(nr / 32)].write(1 << (nr % 32)) };
+        self.nvic.enable(Interrupt::MU_M4);
     }
 
     //pub fn time_delay()
@@ -61,33 +67,12 @@ impl Platform {
     }
 
     pub fn interrupt_enable(&mut self, _vq_id: u8) {
-        interrupt::free(|_cs| {
-            if self.disable_counter > 0 {
-                self.disable_counter -= 1;
-            }
-
-            if self.disable_counter == 0 {
-                //nvic.enable(Interrupt::MU_M4);
-                let nvic = unsafe { &*peripheral::NVIC::ptr() };
-                let nr = Interrupt::MU_M4.nr();
-                unsafe { nvic.iser[usize::from(nr / 32)].write(1 << (nr % 32)) };
-            }
-        });
+        self.nvic.enable(Interrupt::MU_M4);
     }
 
     pub fn interrupt_disable(&mut self, _vq_id: u8) {
-        interrupt::free(|_cs| {
-            // virtqueues use the same NVIC vector
-            // if counter is set - the interrupts are disabled
-            if self.disable_counter == 0 {
-                //nvic.disable(Interrupt::MU_M4);
-                let nvic = unsafe { &*peripheral::NVIC::ptr() };
-                let nr = Interrupt::MU_M4.nr();
-                unsafe { nvic.icer[usize::from(nr / 32)].write(1 << (nr % 32)) };
-            }
-
-            self.disable_counter += 1;
-        });
+        // virtqueues use the same NVIC vector
+        self.nvic.disable(Interrupt::MU_M4);
     }
 
     // memory mapping
